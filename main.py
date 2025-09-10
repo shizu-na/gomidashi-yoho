@@ -1,9 +1,11 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException
-
+from fastapi import FastAPI, Request, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy
-from sqlalchemy.ext.asyncio import create_async_engine
+
+# database.pyから必要なものをインポート
+from database import async_engine, get_db_session
 
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
@@ -21,32 +23,9 @@ from linebot.v3.webhooks import (
 
 load_dotenv()
 
-# --- データベース接続設定 ---
-DATABASE_URL = os.getenv('DATABASE_URL')
-
-# RenderのログでURLが正しく読み込めているか確認
-print(f"取得したDATABASE_URL: {DATABASE_URL}")
-
-if not DATABASE_URL:
-    print("エラー: 環境変数 'DATABASE_URL' が設定されていません。")
-    exit()
-
-# postgres:// を非同期用の postgresql+asyncpg:// に置換
-# これにより、SQLAlchemyに必ずasyncpgドライバーを使うよう明示的に指示する
-if DATABASE_URL.startswith("postgres://"):
-    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
-    # 変換後のURLもログで確認
-    print(f"変換後のASYNC_DATABASE_URL: {ASYNC_DATABASE_URL}")
-else:
-    ASYNC_DATABASE_URL = DATABASE_URL
-
-# データベースエンジンを作成
-engine = create_async_engine(ASYNC_DATABASE_URL)
-metadata = sqlalchemy.MetaData()
-
-# --- FastAPIアプリとLINE Bot API設定 ---
 app = FastAPI()
 
+# --- LINE Bot API設定 ---
 channel_secret = os.getenv('LINE_CHANNEL_SECRET')
 channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 if not channel_secret or not channel_access_token:
@@ -58,25 +37,30 @@ api_client = ApiClient(configuration)
 line_bot_api = MessagingApi(api_client)
 handler = WebhookHandler(channel_secret)
 
-# アプリケーション起動時にDB接続をテスト
+# アプリケーション起動時のイベントハンドラ
 @app.on_event("startup")
 async def startup():
-    try:
-        async with engine.connect() as conn:
-            # 接続テストのために簡単なクエリを実行
-            await conn.execute(sqlalchemy.text("SELECT 1"))
-            print("データベースへの接続に成功しました。")
-    except Exception as e:
-        print(f"データベースへの接続に失敗しました: {e}")
+    print("アプリケーションを起動します。")
+    # ここではエンジン自体の接続はテストしない
+    # 各リクエストでセッションが確立されるため
 
 # --- Webhook処理 ---
 @app.post("/callback")
-async def callback(request: Request):
+async def callback(request: Request, db_session: AsyncSession = Depends(get_db_session)):
     signature = request.headers['X-Line-Signature']
     body = await request.body()
     body = body.decode()
 
+    # 接続テスト: callbackが呼ばれたらDBにクエリを投げてみる
     try:
+        result = await db_session.execute(sqlalchemy.text("SELECT 1"))
+        print(f"データベース接続テスト成功: {result.scalar_one()}")
+    except Exception as e:
+        print(f"データベース接続テスト失敗: {e}")
+        # エラーが発生しても処理は続行する
+    
+    try:
+        # このhandler.handleの中でhandle_messageが呼び出される
         handler.handle(body, signature)
     except InvalidSignatureError:
         raise HTTPException(status_code=400, detail="Invalid signature")
@@ -85,6 +69,9 @@ async def callback(request: Request):
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
+    # 将来的にここでdb_sessionを使ってDB操作を行う
+    print(f"受信メッセージ: {event.message.text}")
+    
     line_bot_api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
