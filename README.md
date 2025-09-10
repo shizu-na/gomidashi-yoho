@@ -21,7 +21,7 @@ LINE\_CHANNEL\_SECRET="あなたのチャネルシークレット"
 LINE\_CHANNEL\_ACCESS\_TOKEN="あなたのチャネルアクセストークン"
 DATABASE\_URL="ローカルのPostgreSQLデータベースURL"
 
-````
+```
 
 ## Renderへのデプロイ設定
 本番環境では、以下の環境変数をRenderのWeb Serviceで設定する必要があります。
@@ -30,4 +30,3 @@ DATABASE\_URL="ローカルのPostgreSQLデータベースURL"
 -   `LINE_CHANNEL_ACCESS_TOKEN`: LINEのチャネルアクセストークン
 -   `DATABASE_URL`: RenderのPostgreSQLから取得したInternal Database URL。
     -   FastAPIの非同期処理のため、URLのスキーマを`postgresql://`から`postgresql+asyncpg://`に**必ず書き換える必要があります。**
-```eof
