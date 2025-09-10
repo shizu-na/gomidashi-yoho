@@ -46,6 +46,13 @@ async def lifespan(app: FastAPI):
 # lifespanをFastAPIアプリに登録
 app = FastAPI(lifespan=lifespan)
 
+@app.get("/")
+def health_check():
+    """
+    Renderのヘルスチェックに応答するためのエンドポイント。
+    """
+    print("ヘルスチェックが実行されました。")
+    return {"status": "ok"}
 
 # --- LINE Bot API設定 ---
 channel_secret = os.getenv('LINE_CHANNEL_SECRET')
