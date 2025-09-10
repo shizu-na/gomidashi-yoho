@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, insert
-
 from models import Schedule
+from . import models
 
 async def upsert_schedule(db_session: AsyncSession, user_id: str, day_of_week: str, item: str) -> Schedule:
     """
@@ -57,3 +57,12 @@ async def get_schedule_by_day(db_session: AsyncSession, user_id: str, day_of_wee
     result = await db_session.execute(query)
     # 該当するスケジュールが1件だけ返ってくるか、何も返ってこないかのどちらかなので、scalar_one_or_none()を使う
     return result.scalar_one_or_none()
+
+async def get_schedules_for_day(db_session: AsyncSession, day_of_week: str) -> list[models.Schedule]:
+    """
+    指定された曜日に登録されている全てのスケジュールを取得する。
+    """
+    statement = select(models.Schedule).where(models.Schedule.day_of_week == day_of_week)
+    result = await db_session.execute(statement)
+    schedules = result.scalars().all()
+    return schedules

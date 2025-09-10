@@ -1,8 +1,9 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy
+import datetime
 
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,7 @@ from linebot.v3.messaging import (
     ApiClient,
     MessagingApi,
     ReplyMessageRequest,
+    PushMessageRequest, # Push APIのために追加
     TextMessage
 )
 from linebot.v3.webhooks import (
@@ -39,7 +41,6 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def health_check():
-    # 再デプロイ用のコメント
     print("ヘルスチェックが実行されました。")
     return {"status": "ok"}
 
@@ -70,6 +71,45 @@ async def callback(request: Request, db_session: AsyncSession = Depends(get_db_s
             await handle_text_message(event, db_session)
 
     return 'OK'
+
+
+# --- Render Cron Job用のエンドポイント ---
+# 環境変数からCron用のシークレットキーを取得
+CRON_SECRET = os.getenv("CRON_SECRET")
+
+@app.post("/send-reminders")
+async def send_reminders(authorization: str | None = Header(default=None), db_session: AsyncSession = Depends(get_db_session)):
+    # 認証チェック
+    if not CRON_SECRET or authorization != f"Bearer {CRON_SECRET}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # 日本時間の「明日」の曜日を取得
+    jst = datetime.timezone(datetime.timedelta(hours=9))
+    now = datetime.datetime.now(jst)
+    tomorrow = now + datetime.timedelta(days=1)
+    day_list = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"]
+    tomorrow_day_of_week = day_list[tomorrow.weekday()]
+
+    print(f"リマインダー実行: 明日 ({tomorrow_day_of_week}) のスケジュールを検索します。")
+
+    # 該当するスケジュールを全て取得
+    schedules = await crud.get_schedules_for_day(db_session, tomorrow_day_of_week)
+
+    # 該当者全員にPushメッセージを送信
+    for schedule in schedules:
+        message_text = f"明日は {schedule.item} の日です！\n忘れずに準備しましょう。"
+        try:
+            line_bot_api.push_message(
+                PushMessageRequest(
+                    to=schedule.user_id,
+                    messages=[TextMessage(text=message_text)]
+                )
+            )
+            print(f"{schedule.user_id} へのPush通知に成功しました。")
+        except Exception as e:
+            print(f"{schedule.user_id} へのPush通知に失敗しました: {e}")
+
+    return {"status": "ok", "sent_count": len(schedules)}
 
 
 async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
