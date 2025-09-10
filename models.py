@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text
 from sqlalchemy.orm import declarative_base
+import sqlalchemy
 
 # declarative_baseは、これから作るクラスが
 # データベースのテーブルと連携するための「基盤」となるものです。
