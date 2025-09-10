@@ -76,10 +76,13 @@ async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
     user_id = event.source.user_id
     reply_text = ""
 
+    # 全角スペースを半角に置換して正規化
+    normalized_text = message_text.replace("　", " ")
+
     try:
         # --- "登録" コマンドの処理 ---
-        if message_text.startswith("登録"):
-            parts = message_text.split()
+        if normalized_text.startswith("登録"):
+            parts = normalized_text.split()
             if len(parts) < 3:
                 reply_text = "登録の形式が違います。\n例: 登録 火曜日 可燃ごみ"
             else:
@@ -89,8 +92,8 @@ async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
                 reply_text = f"{day_of_week}のごみを「{item}」で登録しました。"
 
         # --- "確認" コマンドの処理 ---
-        elif message_text.startswith("確認"):
-            parts = message_text.split()
+        elif normalized_text.startswith("確認"):
+            parts = normalized_text.split()
             if len(parts) < 2:
                 reply_text = "確認の形式が違います。\n例: 確認 火曜日"
             else:
