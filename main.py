@@ -80,18 +80,27 @@ async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
     normalized_text = message_text.replace("　", " ")
 
     try:
-        # --- "登録" コマンドの処理 ---
+        # --- "登録" コマンドの処理 (メモ機能対応) ---
         if normalized_text.startswith("登録"):
-            parts = normalized_text.split()
+            # " メモ " というキーワードで品名と注意事項を分割
+            if " メモ " in normalized_text:
+                main_parts, notes = normalized_text.split(" メモ ", 1)
+            else:
+                main_parts = normalized_text
+                notes = None
+            
+            parts = main_parts.split()
             if len(parts) < 3:
-                reply_text = "登録の形式が違います。\n例: 登録 火曜日 可燃ごみ"
+                reply_text = "登録の形式が違います。\n例: 登録 火曜日 可燃ごみ メモ 注意事項..."
             else:
                 day_of_week = parts[1]
                 item = " ".join(parts[2:])
-                await crud.upsert_schedule(db_session, user_id, day_of_week, item)
+                await crud.upsert_schedule(db_session, user_id, day_of_week, item, notes)
                 reply_text = f"{day_of_week}のごみを「{item}」で登録しました。"
+                if notes:
+                    reply_text += f"\nメモ: {notes}"
 
-        # --- "確認" コマンドの処理 ---
+        # --- "確認" コマンドの処理 (変更なし) ---
         elif normalized_text.startswith("確認"):
             parts = normalized_text.split()
             if len(parts) < 2:
@@ -101,6 +110,21 @@ async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
                 schedule = await crud.get_schedule_by_day(db_session, user_id, day_of_week)
                 if schedule:
                     reply_text = f"{schedule.day_of_week}のごみは「{schedule.item}」です。"
+                else:
+                    reply_text = f"{day_of_week}のごみは登録されていません。"
+
+        # --- "詳細" コマンドの処理 (新規追加) ---
+        elif normalized_text.startswith("詳細"):
+            parts = normalized_text.split()
+            if len(parts) < 2:
+                reply_text = "詳細の形式が違います。\n例: 詳細 火曜日"
+            else:
+                day_of_week = parts[1]
+                schedule = await crud.get_schedule_by_day(db_session, user_id, day_of_week)
+                if schedule:
+                    reply_text = f"{schedule.day_of_week}のごみ詳細\n──────────\n品目：{schedule.item}"
+                    if schedule.notes:
+                        reply_text += f"\nメモ：\n{schedule.notes}"
                 else:
                     reply_text = f"{day_of_week}のごみは登録されていません。"
 
@@ -119,3 +143,4 @@ async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
             messages=[TextMessage(text=reply_text)]
         )
     )
+
