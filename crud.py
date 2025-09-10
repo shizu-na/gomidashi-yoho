@@ -45,3 +45,15 @@ async def upsert_schedule(db_session: AsyncSession, user_id: str, day_of_week: s
     # 変更後のオブジェクトを返す
     await db_session.refresh(record)
     return record
+
+async def get_schedule_by_day(db_session: AsyncSession, user_id: str, day_of_week: str):
+    """
+    指定されたユーザーIDと曜日に基づいて、スケジュールを1件取得する。
+    """
+    query = select(Schedule).where(
+        Schedule.user_id == user_id,
+        Schedule.day_of_week == day_of_week
+    )
+    result = await db_session.execute(query)
+    # 該当するスケジュールが1件だけ返ってくるか、何も返ってこないかのどちらかなので、scalar_one_or_none()を使う
+    return result.scalar_one_or_none()
