@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from database import async_engine, get_db_session
 from models import Base
+import crud
 
 # WebhookHandlerの代わりに、より低レベルなWebhookParserを使います
 from linebot.v3.webhook import WebhookParser
