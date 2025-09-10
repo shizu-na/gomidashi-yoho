@@ -6,6 +6,7 @@ import sqlalchemy
 
 # database.pyから必要なものをインポート
 from database import async_engine, get_db_session
+from models import Base
 
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
@@ -41,8 +42,11 @@ handler = WebhookHandler(channel_secret)
 @app.on_event("startup")
 async def startup():
     print("アプリケーションを起動します。")
-    # ここではエンジン自体の接続はテストしない
-    # 各リクエストでセッションが確立されるため
+    # データベースにテーブルを自動作成する
+    async with async_engine.begin() as conn:
+        # Baseに紐づく全てのテーブルを、存在しない場合のみ作成する
+        await conn.run_sync(Base.metadata.create_all)
+    print("データベースのテーブル準備が完了しました。")
 
 # --- Webhook処理 ---
 @app.post("/callback")
