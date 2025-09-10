@@ -63,15 +63,40 @@ parser = WebhookParser(channel_secret)
 # --- メッセージ処理の関数 ---
 # データベースセッションを受け取れるように、async defで定義します
 async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
-    # ここでdb_sessionを使ってデータベース操作ができます
-    print(f"受信メッセージ: {event.message.text}")
-    print(f"ユーザーID: {event.source.user_id}")
-    
-    # オウム返しロジック
+    message_text = event.message.text
+    user_id = event.source.user_id
+    reply_text = ""
+
+    # "登録" コマンドの処理
+    if message_text.startswith("登録"):
+        # メッセージを分割: "登録 火曜日 可燃ごみ" -> ["登録", "火曜日", "可燃ごみ"]
+        parts = message_text.split()
+        if len(parts) < 3:
+            reply_text = "登録の形式が正しくありません。\n例: 登録 火曜日 可燃ごみ"
+        else:
+            day_of_week = parts[1]
+            item = parts[2]
+            try:
+                # crudの関数を呼び出してDBに保存
+                await crud.upsert_schedule(
+                    db_session=db_session,
+                    user_id=user_id,
+                    day_of_week=day_of_week,
+                    item=item
+                )
+                reply_text = f"{day_of_week}のごみを「{item}」で登録しました。"
+            except Exception as e:
+                print(f"データベース登録エラー: {e}")
+                reply_text = "登録中にエラーが発生しました。もう一度お試しください。"
+    else:
+        # "登録" 以外はオウム返し
+        reply_text = message_text
+
+    # ユーザーに返信
     line_bot_api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
-            messages=[TextMessage(text=event.message.text)]
+            messages=[TextMessage(text=reply_text)]
         )
     )
 
