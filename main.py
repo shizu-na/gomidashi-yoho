@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException
 
-# SQLAlchemyのインポートを追加
 import sqlalchemy
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -20,31 +19,38 @@ from linebot.v3.webhooks import (
     TextMessageContent
 )
 
-# .envファイルから環境変数を読み込む
 load_dotenv()
 
 # --- データベース接続設定 ---
 DATABASE_URL = os.getenv('DATABASE_URL')
+
+# RenderのログでURLが正しく読み込めているか確認
+print(f"取得したDATABASE_URL: {DATABASE_URL}")
+
 if not DATABASE_URL:
-    print("環境変数 'DATABASE_URL' が設定されていません。")
+    print("エラー: 環境変数 'DATABASE_URL' が設定されていません。")
     exit()
 
-# PostgreSQLのURLスキーマを非同期用に変換
+# postgres:// を非同期用の postgresql+asyncpg:// に置換
+# これにより、SQLAlchemyに必ずasyncpgドライバーを使うよう明示的に指示する
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+    ASYNC_DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+    # 変換後のURLもログで確認
+    print(f"変換後のASYNC_DATABASE_URL: {ASYNC_DATABASE_URL}")
+else:
+    ASYNC_DATABASE_URL = DATABASE_URL
 
 # データベースエンジンを作成
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(ASYNC_DATABASE_URL)
 metadata = sqlalchemy.MetaData()
 
-# FastAPIアプリのインスタンスを作成
+# --- FastAPIアプリとLINE Bot API設定 ---
 app = FastAPI()
 
-# --- LINE Bot API設定 ---
 channel_secret = os.getenv('LINE_CHANNEL_SECRET')
 channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 if not channel_secret or not channel_access_token:
-    print("LINEの環境変数が設定されていません。")
+    print("エラー: LINEの環境変数が設定されていません。")
     exit()
 
 configuration = Configuration(access_token=channel_access_token)
@@ -52,18 +58,18 @@ api_client = ApiClient(configuration)
 line_bot_api = MessagingApi(api_client)
 handler = WebhookHandler(channel_secret)
 
-
-# アプリケーション起動時にDB接続をテストするイベントハンドラ
+# アプリケーション起動時にDB接続をテスト
 @app.on_event("startup")
 async def startup():
     try:
         async with engine.connect() as conn:
+            # 接続テストのために簡単なクエリを実行
+            await conn.execute(sqlalchemy.text("SELECT 1"))
             print("データベースへの接続に成功しました。")
     except Exception as e:
         print(f"データベースへの接続に失敗しました: {e}")
 
-
-# /callback エンドポイント
+# --- Webhook処理 ---
 @app.post("/callback")
 async def callback(request: Request):
     signature = request.headers['X-Line-Signature']
@@ -77,11 +83,8 @@ async def callback(request: Request):
 
     return 'OK'
 
-
-# テキストメッセージの処理
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    # 今はまだオウム返し
     line_bot_api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
