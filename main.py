@@ -39,6 +39,7 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 def health_check():
+    # 再デプロイ用のコメント
     print("ヘルスチェックが実行されました。")
     return {"status": "ok"}
 
