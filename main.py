@@ -2,6 +2,10 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException
 
+# SQLAlchemyのインポートを追加
+import sqlalchemy
+from sqlalchemy.ext.asyncio import create_async_engine
+
 from linebot.v3.webhook import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import (
@@ -19,51 +23,65 @@ from linebot.v3.webhooks import (
 # .envファイルから環境変数を読み込む
 load_dotenv()
 
+# --- データベース接続設定 ---
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    print("環境変数 'DATABASE_URL' が設定されていません。")
+    exit()
+
+# PostgreSQLのURLスキーマを非同期用に変換
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+
+# データベースエンジンを作成
+engine = create_async_engine(DATABASE_URL)
+metadata = sqlalchemy.MetaData()
+
 # FastAPIアプリのインスタンスを作成
 app = FastAPI()
 
-# LINEの認証情報を環境変数から取得
+# --- LINE Bot API設定 ---
 channel_secret = os.getenv('LINE_CHANNEL_SECRET')
 channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-
-# 念のため、情報が取得できなかった場合にエラーを出す
-if channel_secret is None or channel_access_token is None:
-    print("環境変数 'LINE_CHANNEL_SECRET' または 'LINE_CHANNEL_ACCESS_TOKEN' が設定されていません。")
+if not channel_secret or not channel_access_token:
+    print("LINEの環境変数が設定されていません。")
     exit()
 
-# LINE Messaging APIと通信するための設定
 configuration = Configuration(access_token=channel_access_token)
 api_client = ApiClient(configuration)
 line_bot_api = MessagingApi(api_client)
-
-# Webhookからのリクエストを処理するハンドラー
 handler = WebhookHandler(channel_secret)
 
 
-# /callback というURLへのPOSTリクエストを処理する関数
+# アプリケーション起動時にDB接続をテストするイベントハンドラ
+@app.on_event("startup")
+async def startup():
+    try:
+        async with engine.connect() as conn:
+            print("データベースへの接続に成功しました。")
+    except Exception as e:
+        print(f"データベースへの接続に失敗しました: {e}")
+
+
+# /callback エンドポイント
 @app.post("/callback")
 async def callback(request: Request):
-    # リクエストヘッダーから署名を取得
     signature = request.headers['X-Line-Signature']
-
-    # リクエストボディをテキストとして取得
     body = await request.body()
     body = body.decode()
 
     try:
-        # 署名を検証し、リクエストを処理
         handler.handle(body, signature)
     except InvalidSignatureError:
-        # 署名が無効な場合はエラー
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     return 'OK'
 
 
-# テキストメッセージを受け取ったときの処理
+# テキストメッセージの処理
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    # 受け取ったメッセージと同じテキストで返信する
+    # 今はまだオウム返し
     line_bot_api.reply_message(
         ReplyMessageRequest(
             reply_token=event.reply_token,
