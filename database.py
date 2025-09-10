@@ -1,8 +1,12 @@
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
+from typing import AsyncGenerator
+
 # .envファイルからではなく、Renderの環境変数を直接参照する
 DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("環境変数 'DATABASE_URL' が設定されていません。")
 
 # postgres:// を非同期用の postgresql+asyncpg:// に置換
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
@@ -22,6 +26,6 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 # FastAPIの各リクエストでデータベースセッションを提供するための関数
-async def get_db_session() -> AsyncSession:
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
