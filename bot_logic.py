@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 import pytz
 from data_manager import get_schedule
-from linebot.v3.messaging import TextMessage, FlexSendMessage
+from linebot.v3.messaging import TextMessage, FlexMessage
 
 # ----------------------------------------------------------------------------
 # 定数定義
@@ -123,7 +123,7 @@ def create_full_schedule_flex_message(is_detailed):
         bubbles.append(bubble)
 
     carousel = {"type": "carousel", "contents": bubbles}
-    return FlexSendMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel)
+    return FlexMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel)
 
 def create_help_flex_message():
     bubble1 = {
@@ -148,4 +148,4 @@ def create_help_flex_message():
         ]}
     }
     carousel = {"type": "carousel", "contents": [bubble1, bubble2]}
-    return FlexSendMessage(alt_text="Botの使い方", contents=carousel)
+    return FlexMessage(alt_text="Botの使い方", contents=carousel)
