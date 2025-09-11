@@ -1,75 +1,23 @@
-# main.py
+# main.py の @handler.add(...) の部分を書き換える
 
-import os
-import sys
-from dotenv import load_dotenv
-
-from fastapi import FastAPI, Request, HTTPException
-
-from linebot.v3 import WebhookHandler
-from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, ReplyMessageRequest, TextMessage
-from linebot.v3.webhooks import MessageEvent, TextMessageContent
-
-# .envファイルから環境変数を読み込む
-load_dotenv()
-
-# FastAPIのインスタンスを作成
-app = FastAPI()
-
-# 環境変数からシークレットとアクセストークンを取得
-channel_secret = os.getenv('LINE_CHANNEL_SECRET')
-channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-
-# 環境変数が設定されていない場合はエラーで終了
-if channel_secret is None:
-    print('Specify LINE_CHANNEL_SECRET as environment variable.')
-    sys.exit(1)
-if channel_access_token is None:
-    print('Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.')
-    sys.exit(1)
-
-# LINE Messaging APIの準備
-handler = WebhookHandler(channel_secret)
-configuration = Configuration(access_token=channel_access_token)
-
-# /callback エンドポイントの作成 (LINEからのWebhookを受け取る場所)
-@app.post("/callback")
-async def handle_callback(request: Request):
-    # X-Line-Signatureヘッダーの値を取得
-    signature = request.headers['X-Line-Signature']
-
-    # リクエストボディをテキストとして取得
-    body = await request.body()
-    body = body.decode()
-
-    try:
-        # 署名を検証し、ハンドラに処理を渡す
-        handler.handle(body, signature)
-    except InvalidSignatureError:
-        # 署名が無効な場合は400エラーを返す
-        raise HTTPException(status_code=400, detail="Invalid signature")
-
-    return 'OK'
-
+# bot_logic.pyからメッセージ処理関数をインポート
+from bot_logic import handle_text_message
 
 # テキストメッセージを受け取ったときの処理
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    # 受け取ったメッセージと送信者の情報をターミナルに表示
-    user_id = event.source.user_id
+    # 受け取ったテキストメッセージ
     text = event.message.text
-    print("-----------------------------")
-    print(f"User ID: {user_id}")
-    print(f"Received message: {text}")
-    print("-----------------------------")
-
-    # 受け取ったメッセージをそのまま返す（オウム返し）
+    
+    # bot_logicに処理を任せて、返信メッセージを受け取る
+    reply_text = handle_text_message(text)
+    
+    # メッセージを返信する
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=f"受け取ったメッセージ： {text}")]
+                messages=[TextMessage(text=reply_text)]
             )
         )
