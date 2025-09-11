@@ -130,11 +130,12 @@ def create_full_schedule_flex_message(is_detailed):
             ])
         bubbles.append(bubble)
 
+    carousel = {"type": "carousel", "contents": bubbles}
+
     # ★【デバッグ用ログ2】LINEに送る直前のFlex Messageの中身を確認
     print("--- [Debug] Carousel object to be sent:")
     print(json.dumps(carousel, indent=2, ensure_ascii=False))
 
-    carousel = {"type": "carousel", "contents": bubbles}
     return FlexMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel)
 
 def create_help_flex_message():
