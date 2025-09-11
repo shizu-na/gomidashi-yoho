@@ -1,146 +1,75 @@
+# main.py
+
 import os
+import sys
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, HTTPException, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-import sqlalchemy
 
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, HTTPException
 
-from database import async_engine, get_db_session
-from models import Base
-import crud
-
-from linebot.v3.webhook import WebhookParser
+from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.messaging import (
-    Configuration,
-    ApiClient,
-    MessagingApi,
-    ReplyMessageRequest,
-    TextMessage
-)
-from linebot.v3.webhooks import (
-    MessageEvent,
-    TextMessageContent
-)
+from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, ReplyMessageRequest, TextMessage
+from linebot.v3.webhooks import MessageEvent, TextMessageContent
 
+# .envファイルから環境変数を読み込む
 load_dotenv()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("アプリケーションを起動します。")
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("データベースのテーブル準備が完了しました。")
-    yield
-    print("アプリケーションを終了します。")
+# FastAPIのインスタンスを作成
+app = FastAPI()
 
-app = FastAPI(lifespan=lifespan)
-
-@app.get("/")
-def health_check():
-    print("ヘルスチェックが実行されました。")
-    return {"status": "ok"}
-
-# --- LINE Bot API設定 ---
+# 環境変数からシークレットとアクセストークンを取得
 channel_secret = os.getenv('LINE_CHANNEL_SECRET')
 channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
-parser = WebhookParser(channel_secret)
 
+# 環境変数が設定されていない場合はエラーで終了
+if channel_secret is None:
+    print('Specify LINE_CHANNEL_SECRET as environment variable.')
+    sys.exit(1)
+if channel_access_token is None:
+    print('Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.')
+    sys.exit(1)
+
+# LINE Messaging APIの準備
+handler = WebhookHandler(channel_secret)
 configuration = Configuration(access_token=channel_access_token)
-api_client = ApiClient(configuration)
-line_bot_api = MessagingApi(api_client)
 
-
-# --- Webhook処理 ---
+# /callback エンドポイントの作成 (LINEからのWebhookを受け取る場所)
 @app.post("/callback")
-async def callback(request: Request, db_session: AsyncSession = Depends(get_db_session)):
+async def handle_callback(request: Request):
+    # X-Line-Signatureヘッダーの値を取得
     signature = request.headers['X-Line-Signature']
+
+    # リクエストボディをテキストとして取得
     body = await request.body()
     body = body.decode()
 
     try:
-        events = parser.parse(body, signature)
+        # 署名を検証し、ハンドラに処理を渡す
+        handler.handle(body, signature)
     except InvalidSignatureError:
+        # 署名が無効な場合は400エラーを返す
         raise HTTPException(status_code=400, detail="Invalid signature")
-
-    for event in events:
-        if isinstance(event, MessageEvent) and isinstance(event.message, TextMessageContent):
-            await handle_text_message(event, db_session)
 
     return 'OK'
 
 
-async def handle_text_message(event: MessageEvent, db_session: AsyncSession):
-    message_text = event.message.text
+# テキストメッセージを受け取ったときの処理
+@handler.add(MessageEvent, message=TextMessageContent)
+def handle_message(event):
+    # 受け取ったメッセージと送信者の情報をターミナルに表示
     user_id = event.source.user_id
-    reply_text = ""
+    text = event.message.text
+    print("-----------------------------")
+    print(f"User ID: {user_id}")
+    print(f"Received message: {text}")
+    print("-----------------------------")
 
-    # 全角スペースを半角に置換して正規化
-    normalized_text = message_text.replace("　", " ")
-
-    try:
-        # --- "登録" コマンドの処理 (メモ機能対応) ---
-        if normalized_text.startswith("登録"):
-            # " メモ " というキーワードで品名と注意事項を分割
-            if " メモ " in normalized_text:
-                main_parts, notes = normalized_text.split(" メモ ", 1)
-            else:
-                main_parts = normalized_text
-                notes = None
-            
-            parts = main_parts.split()
-            if len(parts) < 3:
-                reply_text = "登録の形式が違います。\n例: 登録 火曜日 可燃ごみ メモ 注意事項..."
-            else:
-                day_of_week = parts[1]
-                item = " ".join(parts[2:])
-                await crud.upsert_schedule(db_session, user_id, day_of_week, item, notes)
-                reply_text = f"{day_of_week}のごみを「{item}」で登録しました。"
-                if notes:
-                    reply_text += f"\nメモ: {notes}"
-
-        # --- "確認" コマンドの処理 (変更なし) ---
-        elif normalized_text.startswith("確認"):
-            parts = normalized_text.split()
-            if len(parts) < 2:
-                reply_text = "確認の形式が違います。\n例: 確認 火曜日"
-            else:
-                day_of_week = parts[1]
-                schedule = await crud.get_schedule_by_day(db_session, user_id, day_of_week)
-                if schedule:
-                    reply_text = f"{schedule.day_of_week}のごみは「{schedule.item}」です。"
-                else:
-                    reply_text = f"{day_of_week}のごみは登録されていません。"
-
-        # --- "詳細" コマンドの処理 (新規追加) ---
-        elif normalized_text.startswith("詳細"):
-            parts = normalized_text.split()
-            if len(parts) < 2:
-                reply_text = "詳細の形式が違います。\n例: 詳細 火曜日"
-            else:
-                day_of_week = parts[1]
-                schedule = await crud.get_schedule_by_day(db_session, user_id, day_of_week)
-                if schedule:
-                    reply_text = f"{schedule.day_of_week}のごみ詳細\n──────────\n品目：{schedule.item}"
-                    if schedule.notes:
-                        reply_text += f"\nメモ：\n{schedule.notes}"
-                else:
-                    reply_text = f"{day_of_week}のごみは登録されていません。"
-
-        # --- それ以外のメッセージの処理 ---
-        else:
-            reply_text = message_text  # オウム返し
-
-    except Exception as e:
-        print(f"エラーが発生しました: {e}")
-        reply_text = "処理中にエラーが発生しました。"
-
-    # メッセージを返信する
-    line_bot_api.reply_message(
-        ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[TextMessage(text=reply_text)]
+    # 受け取ったメッセージをそのまま返す（オウム返し）
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        line_bot_api.reply_message_with_http_info(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=f"受け取ったメッセージ： {text}")]
+            )
         )
-    )
-

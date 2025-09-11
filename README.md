@@ -1,35 +1,55 @@
-# ごみ出しリマインダーBot
+# ゴミ出し確認Bot
 
-家族LINEグループでのごみ出し忘れを防止するためのLINE Botです。
-収集日の前日にリマインド通知を送ったり、曜日ごとのごみの種類を問い合わせたりできます。
+家族や友人間で使う、ゴミ出しの日をLINEで確認できるBotです。
 
-## 主な機能
+## 機能
 
-- スケジュールの登録・確認機能
-- 自動リマインド通知機能
+````markdown
+- **スケジュール確認機能**: グループチャットで「@bot 今日」「@bot 月曜 詳細」のように話しかけると、ゴミの品目や注意事項を返信します。
+- **スケジュール管理機能**: 管理者がBotとの1対1チャットで、対話形式でゴミ出しのスケジュールを登録・変更できます。
 
-## 動作環境
+## セットアップ方法
 
-- Python 3.11+
-- FastAPI
-- PostgreSQL
-- LINE Messaging API
+1. **リポジトリをクローンする**
 
-## セットアップ手順
-
-ローカルで開発する場合、`.env`ファイルを作成し、以下の変数を設定してください。
-
-```env
-LINE_CHANNEL_SECRET="あなたのチャネルシークレット"
-LINE_CHANNEL_ACCESS_TOKEN="あなたのチャネルアクセストークン"
-DATABASE_URL="ローカルのPostgreSQLデータベースURL"
+```bash
+git clone [あなたのリポジトリURL]
+cd [リポジトリ名]
 ```
 
-## Renderへのデプロイ設定
+2. **仮想環境を作成し、有効化する**
 
-本番環境では、以下の環境変数をRenderのWeb Serviceで設定する必要があります。
+```bash
+# 仮想環境を作成
+python -m venv venv
+# 仮想環境を有効化 (Windows)
+.\venv\Scripts\activate
+```
 
-- `LINE_CHANNEL_SECRET`: LINEのチャネルシークレット
-- `LINE_CHANNEL_ACCESS_TOKEN`: LINEのチャネルアクセストークン
-- `DATABASE_URL`: RenderのPostgreSQLから取得したInternal Database URL。
-  - FastAPIの非同期処理のため、URLのスキーマを`postgresql://`から`postgresql+asyncpg://`に**必ず書き換える必要があります。**
+3. **必要なライブラリをインストールする**
+
+```bash
+pip install -r requirements.txt
+```
+
+4. **.envファイルを作成する**
+プロジェクトのルートに `.env` ファイルを作成し、以下の内容を記述してください。
+
+```ini
+LINE_CHANNEL_SECRET="あなたのチャンネルシークレット"
+LINE_CHANNEL_ACCESS_TOKEN="あなたのチャンネルアクセストークン"
+ADMIN_USER_ID="あなたのLINEユーザーID"
+GARBAGE_SCHEDULE=''' 
+{
+  "schedules": [
+    { "day_of_week": "月曜", "aliases": ["月", "月曜日"], "item": "燃えるゴミ", "note": "特になし" }
+  ]
+}
+'''
+```
+
+5. **ローカルサーバーを起動する**
+
+```bash
+uvicorn main:app --reload
+```
