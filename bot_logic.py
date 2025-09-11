@@ -5,9 +5,7 @@ import pytz
 from data_manager import get_schedule
 from linebot.v3.messaging import (
     TextMessage,
-    FlexMessage
-)
-from linebot.v3.messaging.models import (
+    FlexMessage,
     CarouselContainer,
     BubbleContainer,
     BoxComponent,
