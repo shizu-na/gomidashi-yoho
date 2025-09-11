@@ -101,6 +101,10 @@ def create_reply_text(day_name, is_detailed):
 
 def create_full_schedule_flex_message(is_detailed):
     schedules = get_schedule()
+
+    if not schedules:
+        return TextMessage(text="申し訳ありません、ゴミ出しのスケジュールが登録されていません。")
+
     bubbles = []
     for schedule in schedules:
         day = schedule.get('day_of_week', '')
