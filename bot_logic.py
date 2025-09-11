@@ -6,11 +6,11 @@ from data_manager import get_schedule
 from linebot.v3.messaging import (
     TextMessage,
     FlexMessage,
-    CarouselContainer,
-    BubbleContainer,
-    BoxComponent,
-    TextComponent,
-    SeparatorComponent
+    FlexCarousel,   # 修正
+    FlexBubble,     # 修正
+    FlexBox,        # 修正
+    FlexText,       # 修正
+    FlexSeparator   # 修正
 )
 
 # ----------------------------------------------------------------------------
@@ -110,7 +110,7 @@ def create_reply_text(day_name, is_detailed):
 def create_full_schedule_flex_message(is_detailed):
     schedules = get_schedule()
     if not schedules:
-        return [TextMessage(text="申し訳ありません、ゴミ出しのスケジュールが登録されていません。")]
+        return TextMessage(text="申し訳ありません、ゴミ出しのスケジュールが登録されていません。")
 
     bubbles = []
     for schedule in schedules:
@@ -119,23 +119,23 @@ def create_full_schedule_flex_message(is_detailed):
         note = schedule.get('note', '特記事項はありません。')
 
         body_contents = [
-            TextComponent(text="品目", size="sm", color="#aaaaaa"),
-            TextComponent(text=item, wrap=True, weight="bold"),
+            FlexText(text="品目", size="sm", color="#aaaaaa"),
+            FlexText(text=item, wrap=True, weight="bold"),
         ]
         
         if is_detailed:
             body_contents.extend([
-                SeparatorComponent(margin="lg"),
-                TextComponent(text="注意事項", size="sm", color="#aaaaaa", margin="lg"),
-                TextComponent(text=note, wrap=True),
+                FlexSeparator(margin="lg"),
+                FlexText(text="注意事項", size="sm", color="#aaaaaa", margin="lg"),
+                FlexText(text=note, wrap=True),
             ])
 
-        bubble = BubbleContainer(
-            header=BoxComponent(
+        bubble = FlexBubble(
+            header=FlexBox(
                 layout="vertical",
-                contents=[TextComponent(text=day, weight="bold", size="xl")]
+                contents=[FlexText(text=day, weight="bold", size="xl")]
             ),
-            body=BoxComponent(
+            body=FlexBox(
                 layout="vertical",
                 spacing="md",
                 contents=body_contents
@@ -143,29 +143,29 @@ def create_full_schedule_flex_message(is_detailed):
         )
         bubbles.append(bubble)
     
-    carousel_container = CarouselContainer(contents=bubbles)
-    return [FlexMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel_container)]
+    carousel_container = FlexCarousel(contents=bubbles)
+    return FlexMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel_container)
 
 def create_help_flex_message():
-    bubble1 = BubbleContainer(
-        header=BoxComponent(layout="vertical", contents=[TextComponent(text="使い方① グループでの確認", weight="bold", size="lg")]),
-        body=BoxComponent(layout="vertical", spacing="lg", contents=[
-            TextComponent(text="品目だけ知りたいとき", weight="bold"),
-            TextComponent(text="例：「@bot 今日」「@bot 月曜」", wrap=True),
-            TextComponent(text="詳細を知りたいとき", weight="bold", margin="lg"),
-            TextComponent(text="例：「@bot 月曜 詳細」「@bot 詳細 全部」", wrap=True),
+    bubble1 = FlexBubble(
+        header=FlexBox(layout="vertical", contents=[FlexText(text="使い方① グループでの確認", weight="bold", size="lg")]),
+        body=FlexBox(layout="vertical", spacing="lg", contents=[
+            FlexText(text="品目だけ知りたいとき", weight="bold"),
+            FlexText(text="例：「@bot 今日」「@bot 月曜」", wrap=True),
+            FlexText(text="詳細を知りたいとき", weight="bold", margin="lg"),
+            FlexText(text="例：「@bot 月曜 詳細」「@bot 詳細 全部」", wrap=True),
         ])
     )
-    bubble2 = BubbleContainer(
-        header=BoxComponent(layout="vertical", contents=[TextComponent(text="使い方② 管理者向け", weight="bold", size="lg")]),
-        body=BoxComponent(layout="vertical", spacing="lg", contents=[
-            TextComponent(text="個人チャットで使います。", wrap=True),
-            TextComponent(text="品目を変更", weight="bold", margin="lg"),
-            TextComponent(text="例：「変更 品目 月」", wrap=True),
-            TextComponent(text="注意事項を変更", weight="bold", margin="lg"),
-            TextComponent(text="例：「変更 注意事項 水」", wrap=True),
+    bubble2 = FlexBubble(
+        header=FlexBox(layout="vertical", contents=[FlexText(text="使い方② 管理者向け", weight="bold", size="lg")]),
+        body=FlexBox(layout="vertical", spacing="lg", contents=[
+            FlexText(text="個人チャットで使います。", wrap=True),
+            FlexText(text="品目を変更", weight="bold", margin="lg"),
+            FlexText(text="例：「変更 品目 月」", wrap=True),
+            FlexText(text="注意事項を変更", weight="bold", margin="lg"),
+            FlexText(text="例：「変更 注意事項 水」", wrap=True),
         ])
     )
     
-    carousel_container = CarouselContainer(contents=[bubble1, bubble2])
-    return [FlexMessage(alt_text="Botの使い方", contents=carousel_container)]
+    carousel_container = FlexCarousel(contents=[bubble1, bubble2])
+    return FlexMessage(alt_text="Botの使い方", contents=carousel_container)
