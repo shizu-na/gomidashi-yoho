@@ -3,7 +3,17 @@ import json
 from datetime import datetime, timedelta
 import pytz
 from data_manager import get_schedule
-from linebot.v3.messaging import TextMessage, FlexMessage
+from linebot.v3.messaging import (
+    TextMessage,
+    FlexMessage
+)
+from linebot.v3.messaging.models import (
+    CarouselContainer,
+    BubbleContainer,
+    BoxComponent,
+    TextComponent,
+    SeparatorComponent
+)
 
 # ----------------------------------------------------------------------------
 # 定数定義
@@ -101,13 +111,8 @@ def create_reply_text(day_name, is_detailed):
 
 def create_full_schedule_flex_message(is_detailed):
     schedules = get_schedule()
-
-    # ★【デバッグ用ログ1】環境変数からスケジュールを正しく取得できているか確認
-    print("--- [Debug] Schedules from get_schedule():")
-    print(schedules)
-
     if not schedules:
-        return TextMessage(text="申し訳ありません、ゴミ出しのスケジュールが登録されていません。")
+        return [TextMessage(text="申し訳ありません、ゴミ出しのスケジュールが登録されていません。")]
 
     bubbles = []
     for schedule in schedules:
@@ -115,55 +120,54 @@ def create_full_schedule_flex_message(is_detailed):
         item = schedule.get('item', '（未設定）')
         note = schedule.get('note', '特記事項はありません。')
 
-        bubble = {
-            "type": "bubble", "header": {"type": "box", "layout": "vertical", "contents": [{"type": "text", "text": day, "weight": "bold", "size": "xl"}]},
-            "body": {"type": "box", "layout": "vertical", "spacing": "md", "contents": [
-                {"type": "text", "text": "品目", "size": "sm", "color": "#aaaaaa"},
-                {"type": "text", "text": item, "wrap": True, "weight": "bold"},
-            ]}
-        }
+        body_contents = [
+            TextComponent(text="品目", size="sm", color="#aaaaaa"),
+            TextComponent(text=item, wrap=True, weight="bold"),
+        ]
+        
         if is_detailed:
-            bubble['body']['contents'].extend([
-                {"type": "separator", "margin": "lg"},
-                {"type": "text", "text": "注意事項", "size": "sm", "color": "#aaaaaa", "margin": "lg"},
-                {"type": "text", "text": note, "wrap": True},
+            body_contents.extend([
+                SeparatorComponent(margin="lg"),
+                TextComponent(text="注意事項", size="sm", color="#aaaaaa", margin="lg"),
+                TextComponent(text=note, wrap=True),
             ])
+
+        bubble = BubbleContainer(
+            header=BoxComponent(
+                layout="vertical",
+                contents=[TextComponent(text=day, weight="bold", size="xl")]
+            ),
+            body=BoxComponent(
+                layout="vertical",
+                spacing="md",
+                contents=body_contents
+            )
+        )
         bubbles.append(bubble)
-
-    carousel = {"type": "carousel", "contents": bubbles}
-
-    # ★【デバッグ用ログ2】LINEに送る直前のFlex Messageの中身を確認
-    print("--- [Debug] Carousel object to be sent:")
-    print(json.dumps(carousel, indent=2, ensure_ascii=False))
-
-    return FlexMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel)
+    
+    carousel_container = CarouselContainer(contents=bubbles)
+    return [FlexMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel_container)]
 
 def create_help_flex_message():
-    bubble1 = {
-        "type": "bubble",
-        "header": {"type": "box", "layout": "vertical", "contents": [{"type": "text", "text": "使い方① グループでの確認", "weight": "bold", "size": "lg"}]},
-        "body": {"type": "box", "layout": "vertical", "spacing": "lg", "contents": [
-            {"type": "text", "text": "品目だけ知りたいとき", "weight": "bold"},
-            {"type": "text", "text": "例：「@bot 今日」「@bot 月曜」", "wrap": True},
-            {"type": "text", "text": "詳細を知りたいとき", "weight": "bold", "margin": "lg"},
-            {"type": "text", "text": "例：「@bot 月曜 詳細」「@bot 詳細 全部」", "wrap": True},
-        ]}
-    }
-    bubble2 = {
-        "type": "bubble",
-        "header": {"type": "box", "layout": "vertical", "contents": [{"type": "text", "text": "使い方② 管理者向け", "weight": "bold", "size": "lg"}]},
-        "body": {"type": "box", "layout": "vertical", "spacing": "lg", "contents": [
-            {"type": "text", "text": "個人チャットで使います。", "wrap": True},
-            {"type": "text", "text": "品目を変更", "weight": "bold", "margin": "lg"},
-            {"type": "text", "text": "例：「変更 品目 月」", "wrap": True},
-            {"type": "text", "text": "注意事項を変更", "weight": "bold", "margin": "lg"},
-            {"type": "text", "text": "例：「変更 注意事項 水」", "wrap": True},
-        ]}
-    }
-    carousel = {"type": "carousel", "contents": [bubble1, bubble2]}
-
-    # ★【デバッグ用ログ3】ヘルプ用のFlex Messageの中身を確認
-    print("--- [Debug] Help Carousel object to be sent:")
-    print(json.dumps(carousel, indent=2, ensure_ascii=False))
-
-    return FlexMessage(alt_text="Botの使い方", contents=carousel)
+    bubble1 = BubbleContainer(
+        header=BoxComponent(layout="vertical", contents=[TextComponent(text="使い方① グループでの確認", weight="bold", size="lg")]),
+        body=BoxComponent(layout="vertical", spacing="lg", contents=[
+            TextComponent(text="品目だけ知りたいとき", weight="bold"),
+            TextComponent(text="例：「@bot 今日」「@bot 月曜」", wrap=True),
+            TextComponent(text="詳細を知りたいとき", weight="bold", margin="lg"),
+            TextComponent(text="例：「@bot 月曜 詳細」「@bot 詳細 全部」", wrap=True),
+        ])
+    )
+    bubble2 = BubbleContainer(
+        header=BoxComponent(layout="vertical", contents=[TextComponent(text="使い方② 管理者向け", weight="bold", size="lg")]),
+        body=BoxComponent(layout="vertical", spacing="lg", contents=[
+            TextComponent(text="個人チャットで使います。", wrap=True),
+            TextComponent(text="品目を変更", weight="bold", margin="lg"),
+            TextComponent(text="例：「変更 品目 月」", wrap=True),
+            TextComponent(text="注意事項を変更", weight="bold", margin="lg"),
+            TextComponent(text="例：「変更 注意事項 水」", wrap=True),
+        ])
+    )
+    
+    carousel_container = CarouselContainer(contents=[bubble1, bubble2])
+    return [FlexMessage(alt_text="Botの使い方", contents=carousel_container)]
