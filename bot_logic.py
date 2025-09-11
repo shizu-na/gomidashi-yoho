@@ -1,5 +1,5 @@
 # bot_logic.py
-
+import json
 from datetime import datetime, timedelta
 import pytz
 from data_manager import get_schedule
@@ -102,6 +102,10 @@ def create_reply_text(day_name, is_detailed):
 def create_full_schedule_flex_message(is_detailed):
     schedules = get_schedule()
 
+    # ★【デバッグ用ログ1】環境変数からスケジュールを正しく取得できているか確認
+    print("--- [Debug] Schedules from get_schedule():")
+    print(schedules)
+
     if not schedules:
         return TextMessage(text="申し訳ありません、ゴミ出しのスケジュールが登録されていません。")
 
@@ -125,6 +129,10 @@ def create_full_schedule_flex_message(is_detailed):
                 {"type": "text", "text": note, "wrap": True},
             ])
         bubbles.append(bubble)
+
+    # ★【デバッグ用ログ2】LINEに送る直前のFlex Messageの中身を確認
+    print("--- [Debug] Carousel object to be sent:")
+    print(json.dumps(carousel, indent=2, ensure_ascii=False))
 
     carousel = {"type": "carousel", "contents": bubbles}
     return FlexMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel)
@@ -152,4 +160,9 @@ def create_help_flex_message():
         ]}
     }
     carousel = {"type": "carousel", "contents": [bubble1, bubble2]}
+
+    # ★【デバッグ用ログ3】ヘルプ用のFlex Messageの中身を確認
+    print("--- [Debug] Help Carousel object to be sent:")
+    print(json.dumps(carousel, indent=2, ensure_ascii=False))
+
     return FlexMessage(alt_text="Botの使い方", contents=carousel)
