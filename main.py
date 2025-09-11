@@ -10,6 +10,7 @@ from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import Configuration, ApiClient, MessagingApi, ReplyMessageRequest, TextMessage
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from linebot.v3.messaging import FlexMessage, FlexSendMessage
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
@@ -59,11 +60,10 @@ async def handle_callback(request: Request):
 # テキストメッセージを受け取ったときの処理
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    # 受け取ったテキストメッセージ
     text = event.message.text
     
-    # bot_logicに処理を任せて、返信メッセージを受け取る
-    reply_text = handle_text_message(text)
+    # bot_logicに処理を任せ、返信内容（メッセージオブジェクト）を受け取る
+    reply_message_object = handle_text_message(text)
     
     # メッセージを返信する
     with ApiClient(configuration) as api_client:
@@ -71,6 +71,6 @@ def handle_message(event):
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_text)]
+                messages=[reply_message_object] # 受け取ったオブジェクトをそのまま設定
             )
         )

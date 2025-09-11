@@ -3,33 +3,29 @@
 from datetime import datetime, timedelta
 import pytz
 from data_manager import get_schedule
+from linebot.v3.messaging import TextMessage, FlexSendMessage
 
 # ----------------------------------------------------------------------------
 # 定数定義
 # ----------------------------------------------------------------------------
 JAPANESE_WEEKDAYS = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"]
 
-# Botが理解できる単語（トークン）のリスト。長い順に定義することが重要。
 VALID_TOKENS = sorted([
     "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日",
     "月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜",
     "月", "火", "水", "木", "金", "土", "日",
     "今日", "明日", "きょう", "あした",
-    "詳細", "全部"
+    "詳細", "全部", "ヘルプ", "使い方"
 ], key=len, reverse=True)
 
-# エイリアスを正規の曜日に変換するための辞書
 DAY_ALIASES = {
     "今日": lambda: get_day_of_week_from_date(datetime.now(pytz.timezone('Asia/Tokyo'))),
     "きょう": lambda: get_day_of_week_from_date(datetime.now(pytz.timezone('Asia/Tokyo'))),
     "明日": lambda: get_day_of_week_from_date(datetime.now(pytz.timezone('Asia/Tokyo')) + timedelta(days=1)),
     "あした": lambda: get_day_of_week_from_date(datetime.now(pytz.timezone('Asia/Tokyo')) + timedelta(days=1)),
-    "月": "月曜", "月曜": "月曜", "月曜日": "月曜",
-    "火": "火曜", "火曜": "火曜", "火曜日": "火曜",
-    "水": "水曜", "水曜": "水曜", "水曜日": "水曜",
-    "木": "木曜", "木曜": "木曜", "木曜日": "木曜",
-    "金": "金曜", "金曜": "金曜", "金曜日": "金曜",
-    "土": "土曜", "土曜": "土曜", "土曜日": "土曜",
+    "月": "月曜", "月曜": "月曜", "月曜日": "月曜", "火": "火曜", "火曜": "火曜", "火曜日": "火曜",
+    "水": "水曜", "水曜": "水曜", "水曜日": "水曜", "木": "木曜", "木曜": "木曜", "木曜日": "木曜",
+    "金": "金曜", "金曜": "金曜", "金曜日": "金曜", "土": "土曜", "土曜": "土曜", "土曜日": "土曜",
     "日": "日曜", "日曜": "日曜", "日曜日": "日曜",
 }
 
@@ -37,23 +33,25 @@ DAY_ALIASES = {
 # メインの処理関数
 # ----------------------------------------------------------------------------
 def handle_text_message(text):
-    # 1. ユーザーのメッセージをトークン（単語）のリストに分割・検証する
     tokens = tokenize_message(text)
-    
-    # 解析に失敗した場合（未知の単語があった場合）
     if tokens is None:
-        return f"ごめんなさい、知らない言葉が含まれているようです🤔\n「今日」「月曜 詳細」のように話しかけてみてくださいね。"
+        return TextMessage(text="ごめんなさい、知らない言葉が含まれているようです🤔")
 
-    # 2. トークンから「対象の曜日リスト」と「詳細フラグ」を抽出
+    # ヘルプが要求されたかチェック
+    if "ヘルプ" in tokens or "使い方" in tokens:
+        return create_help_flex_message()
+
     target_days, is_detailed = extract_info_from_tokens(tokens)
 
-    # 3. 返信メッセージを作成して返す
+    # 「全部」が指定された場合
+    if "全部" in tokens:
+        return create_full_schedule_flex_message(is_detailed)
+
     if not target_days:
-        return "曜日が指定されていません。例えば「明日のごみは？」のように聞いてくださいね。"
+        return TextMessage(text="曜日が指定されていません。例：「月曜」「明日 詳細」")
     
-    # 複数曜日の情報を結合して返信
-    reply_messages = [create_reply_message(day, is_detailed) for day in target_days]
-    return "\n\n".join(reply_messages)
+    reply_messages = [create_reply_text(day, is_detailed) for day in target_days]
+    return TextMessage(text="\n\n".join(reply_messages))
 
 # ----------------------------------------------------------------------------
 # 補助関数
@@ -61,7 +59,6 @@ def handle_text_message(text):
 def tokenize_message(text):
     original_text = text.strip()
     tokens = []
-    
     while original_text:
         found_token = False
         for token in VALID_TOKENS:
@@ -70,43 +67,85 @@ def tokenize_message(text):
                 original_text = original_text[len(token):].strip()
                 found_token = True
                 break
-        
-        if not found_token:
-            return None # 解析失敗
-            
+        if not found_token: return None
     return tokens
 
 def extract_info_from_tokens(tokens):
-    target_days = set() # 重複を避けるためセットを使用
+    target_days = set()
     is_detailed = "詳細" in tokens
-    
     for token in tokens:
         if token in DAY_ALIASES:
             alias_value = DAY_ALIASES[token]
-            # 「今日」「明日」の場合は関数を実行して曜日を取得
-            if callable(alias_value):
-                target_days.add(alias_value())
-            else:
-                target_days.add(alias_value)
-
+            if callable(alias_value): target_days.add(alias_value())
+            else: target_days.add(alias_value)
     return sorted(list(target_days), key=JAPANESE_WEEKDAYS.index), is_detailed
 
 def get_day_of_week_from_date(dt):
     return JAPANESE_WEEKDAYS[dt.weekday()]
 
-def create_reply_message(day_name, is_detailed):
+# ----------------------------------------------------------------------------
+# 返信内容を作成する部分
+# ----------------------------------------------------------------------------
+def create_reply_text(day_name, is_detailed):
     schedules = get_schedule()
-    
     for schedule in schedules:
         if schedule['day_of_week'] == day_name:
             item = schedule.get('item', '（未設定）')
-            
             if not is_detailed:
                 return f"【{day_name}】のゴミは「{item}」です。"
             else:
                 note = schedule.get('note', '特記事項はありません。')
-                if not note or note in ["特になし", "なし"]:
-                    note = "特記事項はありません。"
+                if not note or note in ["特になし", "なし"]: note = "特記事項はありません。"
                 return f"【{day_name}】\n品目：{item}\n\n注意事項：\n{note}"
-
     return f"【{day_name}】のゴミ情報は見つかりませんでした。"
+
+def create_full_schedule_flex_message(is_detailed):
+    schedules = get_schedule()
+    bubbles = []
+    for schedule in schedules:
+        day = schedule.get('day_of_week', '')
+        item = schedule.get('item', '（未設定）')
+        note = schedule.get('note', '特記事項はありません。')
+
+        bubble = {
+            "type": "bubble", "header": {"type": "box", "layout": "vertical", "contents": [{"type": "text", "text": day, "weight": "bold", "size": "xl"}]},
+            "body": {"type": "box", "layout": "vertical", "spacing": "md", "contents": [
+                {"type": "text", "text": "品目", "size": "sm", "color": "#aaaaaa"},
+                {"type": "text", "text": item, "wrap": True, "weight": "bold"},
+            ]}
+        }
+        if is_detailed:
+            bubble['body']['contents'].extend([
+                {"type": "separator", "margin": "lg"},
+                {"type": "text", "text": "注意事項", "size": "sm", "color": "#aaaaaa", "margin": "lg"},
+                {"type": "text", "text": note, "wrap": True},
+            ])
+        bubbles.append(bubble)
+
+    carousel = {"type": "carousel", "contents": bubbles}
+    return FlexSendMessage(alt_text="今週のゴミ出しスケジュール", contents=carousel)
+
+def create_help_flex_message():
+    bubble1 = {
+        "type": "bubble",
+        "header": {"type": "box", "layout": "vertical", "contents": [{"type": "text", "text": "使い方① グループでの確認", "weight": "bold", "size": "lg"}]},
+        "body": {"type": "box", "layout": "vertical", "spacing": "lg", "contents": [
+            {"type": "text", "text": "品目だけ知りたいとき", "weight": "bold"},
+            {"type": "text", "text": "例：「@bot 今日」「@bot 月曜」", "wrap": True},
+            {"type": "text", "text": "詳細を知りたいとき", "weight": "bold", "margin": "lg"},
+            {"type": "text", "text": "例：「@bot 月曜 詳細」「@bot 詳細 全部」", "wrap": True},
+        ]}
+    }
+    bubble2 = {
+        "type": "bubble",
+        "header": {"type": "box", "layout": "vertical", "contents": [{"type": "text", "text": "使い方② 管理者向け", "weight": "bold", "size": "lg"}]},
+        "body": {"type": "box", "layout": "vertical", "spacing": "lg", "contents": [
+            {"type": "text", "text": "個人チャットで使います。", "wrap": True},
+            {"type": "text", "text": "品目を変更", "weight": "bold", "margin": "lg"},
+            {"type": "text", "text": "例：「変更 品目 月」", "wrap": True},
+            {"type": "text", "text": "注意事項を変更", "weight": "bold", "margin": "lg"},
+            {"type": "text", "text": "例：「変更 注意事項 水」", "wrap": True},
+        ]}
+    }
+    carousel = {"type": "carousel", "contents": [bubble1, bubble2]}
+    return FlexSendMessage(alt_text="Botの使い方", contents=carousel)
