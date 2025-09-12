@@ -1,0 +1,119 @@
+{
+  "type": "carousel",
+  "contents": [
+    {
+      "type": "bubble",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "使い方（基本）",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center",
+            "size": "lg"
+          }
+        ],
+        "backgroundColor": "#176FB8",
+        "paddingAll": "10px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "● 品目だけ知りたいとき",
+            "weight": "bold",
+            "size": "md"
+          },
+          {
+            "type": "text",
+            "text": "「@bot 今日」\n「@bot 月曜」\n「@bot 火金」",
+            "align": "center",
+            "wrap": true,
+            "margin": "md"
+          },
+          {
+            "type": "separator",
+            "margin": "xl"
+          },
+          {
+            "type": "text",
+            "text": "● 詳細も知りたいとき",
+            "weight": "bold",
+            "margin": "lg",
+            "size": "md"
+          },
+          {
+            "type": "text",
+            "text": "「@bot 月曜 詳細」",
+            "align": "center",
+            "wrap": true,
+            "margin": "md"
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "sm"
+      }
+    },
+    {
+      "type": "bubble",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "使い方（一覧表示）",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center",
+            "size": "lg"
+          }
+        ],
+        "backgroundColor": "#5A9E46",
+        "paddingAll": "10px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "● 全てのスケジュールを確認",
+            "weight": "bold",
+            "size": "md"
+          },
+          {
+            "type": "text",
+            "text": "「@bot 全部」",
+            "align": "center",
+            "margin": "md"
+          },
+          {
+            "type": "separator",
+            "margin": "xl"
+          },
+          {
+            "type": "text",
+            "text": "● 全ての詳細を確認",
+            "weight": "bold",
+            "margin": "lg",
+            "size": "md"
+          },
+          {
+            "type": "text",
+            "text": "「@bot 詳細 全部」",
+            "align": "center",
+            "margin": "md"
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "sm"
+      }
+    }
+  ]
+}

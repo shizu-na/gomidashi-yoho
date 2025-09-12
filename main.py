@@ -1,88 +1,119 @@
 import os
 import sys
-import logging  # loggingをインポート
+import logging
+from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 
-from fastapi import FastAPI, Request, HTTPException, Header
-from linebot.v3 import WebhookParser
-from linebot.v3.exceptions import InvalidSignatureError, ApiException  # ApiExceptionをインポート
+# --- LINE Bot SDK v3 ---
+from linebot.v3 import WebhookHandler
+from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import (
     Configuration,
     ApiClient,
     MessagingApi,
-    ReplyMessageRequest,
+    ReplyMessageRequest
 )
-from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from linebot.v3.webhooks import (
+    MessageEvent,
+    TextMessageContent,
+)
 
-# .envファイルから環境変数を読み込む
-load_dotenv()
+# --- Bot Modules ---
+import bot_service
 
-# loggingの設定
+# -----------------------------------------------------------------------------
+# 1. Initialization and Configuration
+# -----------------------------------------------------------------------------
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# bot_logic.pyからメッセージ処理関数をインポート
-from bot_logic import handle_text_message
+# Load environment variables from .env file for local development
+load_dotenv()
 
-# FastAPIのインスタンスを作成
+# Initialize FastAPI app
 app = FastAPI()
 
-# 環境変数からシークレットとアクセストークンを取得
-channel_secret = os.getenv('LINE_CHANNEL_SECRET')
-channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
+# Get LINE Bot credentials from environment variables
+CHANNEL_SECRET = os.getenv('LINE_CHANNEL_SECRET', None)
+CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
 
-# 環境変数が設定されていない場合はエラーで終了
-if channel_secret is None:
-    logging.error('Specify LINE_CHANNEL_SECRET as an environment variable.')
-    sys.exit(1)
-if channel_access_token is None:
-    logging.error('Specify LINE_CHANNEL_ACCESS_TOKEN as an environment variable.')
+if not CHANNEL_SECRET or not CHANNEL_ACCESS_TOKEN:
+    logger.critical("Environment variables LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN must be set.")
     sys.exit(1)
 
-# LINE Messaging APIの準備
-configuration = Configuration(access_token=channel_access_token)
-api_client = ApiClient(configuration)
-line_bot_api = MessagingApi(api_client)
-parser = WebhookParser(channel_secret)
+# Configure LINE Messaging API
+configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(CHANNEL_SECRET)
 
+# -----------------------------------------------------------------------------
+# 2. Webhook Endpoint
+# -----------------------------------------------------------------------------
 
 @app.post("/callback")
-async def handle_callback(request: Request, x_line_signature: str = Header(None)):
+async def callback(request: Request):
     """
-    LINEからのWebhookを処理します。
+    Webhook endpoint to receive events from LINE.
     """
-    body = await request.body()
-    body_str = body.decode() # ログ出力用に文字列に変換
-    logging.info(f"Request body: {body_str}")
+    # Get X-Line-Signature header value
+    signature = request.headers.get('X-Line-Signature')
+    if not signature:
+        raise HTTPException(status_code=400, detail="X-Line-Signature header is missing")
 
+    # Get request body as text
+    body = await request.body()
+    body_str = body.decode('utf-8')
+    logger.info(f"Request body: {body_str}")
+
+    # Handle webhook body
     try:
-        # 署名を検証し、イベントをパースする
-        events = parser.parse(body_str, x_line_signature)
+        handler.handle(body_str, signature)
     except InvalidSignatureError:
-        logging.warning("Invalid signature. Please check your channel secret.")
+        logger.warning("Invalid signature. Please check your channel secret.")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    for event in events:
-        if isinstance(event, MessageEvent) and isinstance(event.message, TextMessageContent):
-            # bot_logicに処理を任せ、返信内容を受け取る
-            reply_message = handle_text_message(event.message.text)
-            
-            # 空のメッセージでないことを確認してから送信
-            if reply_message:
-                try:
-                    # [変更なし] ここは元のコードが完璧です
-                    # handle_text_messageは常に単一オブジェクトを返すため、
-                    # reply_message APIに渡すためにリスト化します。
-                    messages_to_send = [reply_message] if not isinstance(reply_message, list) else reply_message
-                    
-                    line_bot_api.reply_message(
-                        ReplyMessageRequest(
-                            reply_token=event.reply_token,
-                            messages=messages_to_send
-                        )
-                    )
-                except ApiException as e:
-                    # API呼び出しでエラーが発生した場合のログ
-                    logging.error(f"Failed to reply message: {e.body}")
+    return "OK"
 
-    return 'OK'
+# -----------------------------------------------------------------------------
+# 3. Event Handlers
+# -----------------------------------------------------------------------------
+
+@handler.add(MessageEvent, message=TextMessageContent)
+def handle_text_message(event: MessageEvent):
+    """
+    Handler for text messages.
+    It passes the text to the bot service and sends the returned message.
+    """
+    # Delegate the logic to bot_service
+    # bot_serviceは常にリスト形式でメッセージオブジェクトを返します
+    reply_messages = bot_service.process_user_message(event.message.text)
+
+    # Send the reply if any message is generated
+    if reply_messages:
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            try:
+                line_bot_api.reply_message_with_http_info(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=reply_messages
+                    )
+                )
+                logger.info("Successfully replied to the message.")
+            except Exception as e:
+                logger.error(f"Failed to reply message: {e}")
+
+# Default handler for any other events
+@handler.default()
+def default_handler(event):
+    """
+    Default handler for events not explicitly handled.
+    """
+    logger.info(f"Received an unhandled event: {event}")
+
+# -----------------------------------------------------------------------------
+# For local development:
+# uvicorn main:app --reload
+# -----------------------------------------------------------------------------
+
