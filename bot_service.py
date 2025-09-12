@@ -124,20 +124,16 @@ def _create_full_schedule_flex_message(is_detailed: bool) -> Union[FlexMessage, 
         day = schedule.get('day_of_week', '（未設定）')
         item = schedule.get('item', '（未設定）')
         
-        # ▼▼▼▼▼【ここが修正点です】▼▼▼▼▼
         # 'note'キーの値を取得し、もしそれがNoneや空文字列であれば、デフォルトの文字列を使います。
         note = schedule.get('note') or '特記事項はありません。'
-        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         # Bubble (カード) の中身を動的に構築
         body_contents = [
-            {"type": "text", "text": "品目", "size": "sm", "color": "#aaaaaa"},
             {"type": "text", "text": item, "wrap": True, "weight": "bold", "size": "md"},
         ]
         if is_detailed:
             body_contents.extend([
                 {"type": "separator", "margin": "lg"},
-                {"type": "text", "text": "注意事項", "size": "sm", "color": "#aaaaaa", "margin": "lg"},
                 # 修正後のnote変数をここで使います
                 {"type": "text", "text": note, "wrap": True},
             ])
@@ -148,7 +144,9 @@ def _create_full_schedule_flex_message(is_detailed: bool) -> Union[FlexMessage, 
             "header": {
                 "type": "box",
                 "layout": "vertical",
-                "contents": [{"type": "text", "text": day, "weight": "bold", "size": "xl", "color": "#176FB8"}]
+                "contents": [{"type": "text", "text": day, "weight": "bold", "size": "xl", "color": "#176FB8", "align": "center"}],
+                "paddingAll": "10px", # Paddingを追加
+                "backgroundColor": "#f0f8ff" # 背景色を追加
             },
             "body": {
                 "type": "box",
@@ -179,7 +177,6 @@ def _create_single_day_text(day_name: str, is_detailed: bool) -> str:
             if not is_detailed:
                 return f"【{day_name}】\n{item}"
             else:
-                # こちらも同様の修正を加えておきます
                 note = schedule.get('note') or '特記事項はありません。'
                 return f"【{day_name}】\n品目: {item}\n\n注意事項:\n{note}"
     return f"【{day_name}】\nゴミ出しの予定はありません。"
