@@ -123,7 +123,11 @@ def _create_full_schedule_flex_message(is_detailed: bool) -> Union[FlexMessage, 
     for schedule in sorted_schedules:
         day = schedule.get('day_of_week', '（未設定）')
         item = schedule.get('item', '（未設定）')
-        note = schedule.get('note', '特記事項はありません。')
+        
+        # ▼▼▼▼▼【ここが修正点です】▼▼▼▼▼
+        # 'note'キーの値を取得し、もしそれがNoneや空文字列であれば、デフォルトの文字列を使います。
+        note = schedule.get('note') or '特記事項はありません。'
+        # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
         # Bubble (カード) の中身を動的に構築
         body_contents = [
@@ -134,6 +138,7 @@ def _create_full_schedule_flex_message(is_detailed: bool) -> Union[FlexMessage, 
             body_contents.extend([
                 {"type": "separator", "margin": "lg"},
                 {"type": "text", "text": "注意事項", "size": "sm", "color": "#aaaaaa", "margin": "lg"},
+                # 修正後のnote変数をここで使います
                 {"type": "text", "text": note, "wrap": True},
             ])
         
@@ -174,6 +179,8 @@ def _create_single_day_text(day_name: str, is_detailed: bool) -> str:
             if not is_detailed:
                 return f"【{day_name}】\n{item}"
             else:
-                note = schedule.get('note', '特記事項はありません。')
+                # こちらも同様の修正を加えておきます
+                note = schedule.get('note') or '特記事項はありません。'
                 return f"【{day_name}】\n品目: {item}\n\n注意事項:\n{note}"
     return f"【{day_name}】\nゴミ出しの予定はありません。"
+
