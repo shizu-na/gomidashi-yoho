@@ -59,10 +59,40 @@ function createReplyMessage(userMessage) {
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
   let replyText = '';
 
+  // 「今日」または「きょう」のコマンド
   if (command === '今日' || command === 'きょう') {
-    // ... (「今日」のロジックは変更なし)
+    const today = new Date();
+    const dayOfWeek = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'][today.getDay()];
+
+    for (const row of data) {
+      if (row[0] === dayOfWeek) { // A列の曜日でチェック
+        const garbageType = row[2];
+        const notes = row[3];
+        replyText = `今日のゴミは【${garbageType}】です。`;
+        if (isDetailed && notes && notes !== '-') {
+          replyText += `\n📝 注意事項：${notes}`;
+        }
+        break; // 一致したらループを抜ける
+      }
+    }
+    if (!replyText) {
+      replyText = '今日のゴミ出し情報は見つかりませんでした。';
+    }
   } else {
-    // ... (特定曜日のロジックは変更なし)
+    // 特定の曜日のコマンド
+    for (const row of data) {
+      const searchKeys = row[1];
+      if (searchKeys.includes(command)) {
+        const dayName = row[0];
+        const garbageType = row[2];
+        const notes = row[3];
+        replyText = `${dayName}のゴミは【${garbageType}】です。`;
+        if (isDetailed && notes && notes !== '-') {
+          replyText += `\n📝 注意事項：${notes}`;
+        }
+        break; // 一致したらループを抜ける
+      }
+    }
   }
 
   if (replyText) {
