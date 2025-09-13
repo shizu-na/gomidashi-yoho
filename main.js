@@ -11,14 +11,12 @@ function doPost(e) {
   const replyToken = event.replyToken;
   const userMessage = event.message.text;
 
-  // 返信メッセージオブジェクト（テキストまたはFlex Message）を作成する
   const replyMessage = createReplyMessage(userMessage);
 
   if (!replyMessage) {
     return;
   }
 
-  // LINEに返信する
   UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
     'headers': {
       'Content-Type': 'application/json; charset=UTF-8',
@@ -27,7 +25,7 @@ function doPost(e) {
     'method': 'post',
     'payload': JSON.stringify({
       'replyToken': replyToken,
-      'messages': [replyMessage], // 作成したメッセージオブジェクトをそのまま入れる
+      'messages': [replyMessage],
     }),
   });
 }
@@ -46,7 +44,7 @@ function createReplyMessage(userMessage) {
   const isDetailed = rawCommand.includes('詳細');
   const command = rawCommand.replace('詳細', '').trim();
 
-  // --- Flex Messageを返すコマンド ---
+  // Flex Messageを返すコマンド
   if (command === '全部') {
     return createScheduleFlexMessage(isDetailed);
   }
@@ -54,7 +52,6 @@ function createReplyMessage(userMessage) {
     return getHelpFlexMessage();
   }
 
-  // --- テキストメッセージを返すコマンド ---
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
   let replyText = '';
@@ -65,21 +62,22 @@ function createReplyMessage(userMessage) {
     const dayOfWeek = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'][today.getDay()];
 
     for (const row of data) {
-      if (row[0] === dayOfWeek) { // A列の曜日でチェック
+      if (row[0] === dayOfWeek) {
         const garbageType = row[2];
         const notes = row[3];
         replyText = `今日のゴミは【${garbageType}】です。`;
         if (isDetailed && notes && notes !== '-') {
           replyText += `\n📝 注意事項：${notes}`;
         }
-        break; // 一致したらループを抜ける
+        break;
       }
     }
     if (!replyText) {
       replyText = '今日のゴミ出し情報は見つかりませんでした。';
     }
-  } else {
-    // 特定の曜日のコマンド
+  } 
+  // コマンドが空文字でない場合のみ、特定の曜日を検索する
+  else if (command) { 
     for (const row of data) {
       const searchKeys = row[1];
       if (searchKeys.includes(command)) {
@@ -90,15 +88,15 @@ function createReplyMessage(userMessage) {
         if (isDetailed && notes && notes !== '-') {
           replyText += `\n📝 注意事項：${notes}`;
         }
-        break; // 一致したらループを抜ける
+        break;
       }
     }
   }
 
   if (replyText) {
-    return { type: 'text', text: replyText }; // テキストをLINEの形式に変換
+    return { type: 'text', text: replyText };
   }
-
+  
   const fallbackText = 'すみません、コマンドが分かりませんでした。\n「@bot 使い方」でヘルプを表示します。';
   return { type: 'text', text: fallbackText };
 }
