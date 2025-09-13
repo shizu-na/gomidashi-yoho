@@ -40,31 +40,23 @@ function doPost(e) {
  * @returns {string | null} - 返信するテキスト。返信不要の場合はnull
  */
 function getReplyMessage(userMessage) {
-  // "@bot"で始まらないメッセージは無視する
   if (!userMessage.startsWith('@bot')) {
     return null;
   }
 
-  // "@bot" とその後のスペースを削除してコマンド部分を抽出
   const command = userMessage.replace('@bot', '').trim();
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
 
-  // 「今日」または「きょう」というコマンドに応答する
+  // 「今日」または「きょう」のコマンド
   if (command === '今日' || command === 'きょう') {
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
-    // スプレッドシートのA2セルから最終行までのデータを取得（ヘッダーを除く）
-    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
-    
-    // 今日の曜日を日本語で取得（例：「月曜日」）
     const today = new Date();
     const dayOfWeek = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'][today.getDay()];
 
-    // データの中から今日の曜日の行を探す
     for (const row of data) {
-      const sheetDay = row[0]; // A列の曜日
-      if (sheetDay === dayOfWeek) {
-        const garbageType = row[2]; // C列のゴミの種類
-        const notes = row[3];       // D列の注意事項
-        
+      if (row[0] === dayOfWeek) { // A列の曜日でチェック
+        const garbageType = row[2];
+        const notes = row[3];
         let reply = `今日のゴミは【${garbageType}】です。`;
         if (notes && notes !== '-') {
           reply += `\n📝 注意事項：${notes}`;
@@ -74,9 +66,27 @@ function getReplyMessage(userMessage) {
     }
     return '今日のゴミ出し情報は見つかりませんでした。';
   }
-  
-  // 他のコマンドはまだ実装していないのでnullを返す
-  return null;
+
+  // --- ▼ここからが新しいコード▼ ---
+
+  // 特定の曜日のコマンド（例: "月", "火曜"）
+  for (const row of data) {
+    const searchKeys = row[1]; // B列の検索キー（例: "火,火曜"）
+    if (searchKeys.includes(command)) {
+      const dayName = row[0]; // A列の曜日名
+      const garbageType = row[2]; // C列のゴミの種類
+      const notes = row[3]; // D列の注意事項
+
+      let reply = `${dayName}のゴミは【${garbageType}】です。`;
+      if (notes && notes !== '-') {
+        reply += `\n📝 注意事項：${notes}`;
+      }
+      return reply;
+    }
+  }
+
+  // どのコマンドにも当てはまらなかった場合
+  return 'すみません、コマンドが分かりませんでした。\n「@bot 使い方」でヘルプを表示します。';
 }
 
 /**
