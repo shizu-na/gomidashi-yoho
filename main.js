@@ -1,5 +1,5 @@
 // --- 設定項目 ---
-const SPREADSHEET_ID = '1i-VJ1l557d5dd0qtAmI00Z0tvWHprDy9yVZU-CAQrX0';
+const SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
 const SHEET_NAME = 'test'; // あなたのシート名に合わせてください
 
 /**
