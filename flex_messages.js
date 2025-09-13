@@ -6,181 +6,190 @@ function getHelpFlexMessage() {
     "type": "carousel",
     "contents": [
         {
-        "type": "bubble",
-        "size": "deca",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "確認（基本）",
-                "color": "#FFFFFF",
-                "weight": "bold",
-                "align": "center",
-                "size": "lg"
+            "type": "bubble",
+            "size": "deca",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "確認（基本）",
+                        "color": "#FFFFFF",
+                        "weight": "bold",
+                        "align": "center",
+                        "size": "lg"
+                    }
+                ],
+                "backgroundColor": "#176FB8",
+                "paddingAll": "10px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "● 品目のみ確認",
+                        "weight": "bold",
+                        "size": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「@bot 今日」\n「@bot 月曜」",
+                        "align": "center",
+                        "wrap": true,
+                        "margin": "md"
+                    },
+                    {
+                        "type": "separator",
+                        "margin": "xl"
+                    },
+                    {
+                        "type": "text",
+                        "text": "● 詳細も確認",
+                        "weight": "bold",
+                        "margin": "lg",
+                        "size": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「@bot 月曜 詳細」",
+                        "align": "center",
+                        "wrap": true,
+                        "margin": "md"
+                    }
+                ],
+                "paddingAll": "15px",
+                "spacing": "sm"
             }
-            ],
-            "backgroundColor": "#176FB8",
-            "paddingAll": "10px"
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "● 品目のみ確認",
-                "weight": "bold",
-                "size": "md"
-            },
-            {
-                "type": "text",
-                "text": "「@bot 今日」\n「@bot 月曜」",
-                "align": "center",
-                "wrap": true,
-                "margin": "md"
-            },
-            {
-                "type": "separator",
-                "margin": "xl"
-            },
-            {
-                "type": "text",
-                "text": "● 詳細も確認",
-                "weight": "bold",
-                "margin": "lg",
-                "size": "md"
-            },
-            {
-                "type": "text",
-                "text": "「@bot 月曜 詳細」",
-                "align": "center",
-                "wrap": true,
-                "margin": "md"
-            }
-            ],
-            "paddingAll": "15px",
-            "spacing": "sm"
-        }
-        },
-        {
-        "type": "bubble",
-        "size": "deca",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "確認（一覧表示）",
-                "color": "#FFFFFF",
-                "weight": "bold",
-                "align": "center",
-                "size": "lg"
-            }
-            ],
-            "backgroundColor": "#5A9E46",
-            "paddingAll": "10px"
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "● 全ての品目を確認",
-                "weight": "bold",
-                "size": "md"
-            },
-            {
-                "type": "text",
-                "text": "「@bot 全部」",
-                "align": "center",
-                "margin": "md"
-            },
-            {
-                "type": "separator",
-                "margin": "lg"
-            },
-            {
-                "type": "text",
-                "text": "● 全ての詳細を確認",
-                "weight": "bold",
-                "margin": "lg",
-                "size": "md"
-            },
-            {
-                "type": "text",
-                "text": "「@bot 詳細 全部」",
-                "align": "center",
-                "margin": "md"
-            }
-            ],
-            "paddingAll": "15px",
-            "spacing": "sm"
-        }
         },
         {
-        "type": "bubble",
-        "size": "deca",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "変更（個人チャット）",
-                "size": "lg",
-                "color": "#FFFFFF",
-                "weight": "bold",
-                "align": "center"
+            "type": "bubble",
+            "size": "deca",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "確認（一覧表示）",
+                        "color": "#FFFFFF",
+                        "weight": "bold",
+                        "align": "center",
+                        "size": "lg"
+                    }
+                ],
+                "backgroundColor": "#5A9E46",
+                "paddingAll": "10px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "● 全ての品目を確認",
+                        "weight": "bold",
+                        "size": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「@bot 全部」",
+                        "align": "center",
+                        "margin": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "separator",
+                        "margin": "lg"
+                    },
+                    {
+                        "type": "text",
+                        "text": "● 全ての詳細を確認",
+                        "weight": "bold",
+                        "margin": "lg",
+                        "size": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「@bot 詳細 全部」",
+                        "align": "center",
+                        "margin": "md",
+                        "wrap": true
+                    }
+                ],
+                "paddingAll": "15px",
+                "spacing": "sm"
             }
-            ],
-            "backgroundColor": "#DC3545",
-            "paddingAll": "10px"
         },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "● 品目 or 注意事項を変更",
-                "size": "md",
-                "weight": "bold"
+        {
+            "type": "bubble",
+            "size": "deca",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "変更（個人チャット）",
+                        "size": "lg",
+                        "color": "#FFFFFF",
+                        "weight": "bold",
+                        "align": "center"
+                    }
+                ],
+                "backgroundColor": "#DC3545",
+                "paddingAll": "10px"
             },
-            {
-                "type": "text",
-                "text": "「変更 品目 月」\n「変更 品目 全部」\n「変更 注意事項 木」",
-                "margin": "md",
-                "align": "center",
-                "wrap": true
-            },
-            {
-                "type": "separator",
-                "margin": "xl"
-            },
-            {
-                "type": "text",
-                "text": "● 両方まとめて変更",
-                "size": "md",
-                "weight": "bold",
-                "margin": "lg"
-            },
-            {
-                "type": "text",
-                "text": "「変更 火曜 詳細」",
-                "align": "center",
-                "margin": "md"
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "● 品目 or 注意事項を変更",
+                        "size": "md",
+                        "weight": "bold",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「変更 品目 月」\n「変更 品目 全部」\n「変更 注意事項 木」",
+                        "margin": "md",
+                        "align": "center",
+                        "wrap": true
+                    },
+                    {
+                        "type": "separator",
+                        "margin": "xl"
+                    },
+                    {
+                        "type": "text",
+                        "text": "● 両方まとめて変更",
+                        "size": "md",
+                        "weight": "bold",
+                        "margin": "lg",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「変更 火曜 詳細」",
+                        "align": "center",
+                        "margin": "md",
+                        "wrap": true
+                    }
+                ],
+                "spacing": "sm",
+                "paddingAll": "15px"
             }
-            ],
-            "spacing": "sm",
-            "paddingAll": "15px"
-        }
         }
     ]
-    }
+}
 
   return {
     "type": "flex",
