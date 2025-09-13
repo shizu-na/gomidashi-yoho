@@ -44,7 +44,19 @@ function getReplyMessage(userMessage) {
     return null;
   }
 
-  const command = userMessage.replace('@bot', '').trim();
+  // 生のコマンド（"@bot"を除いた部分）を取得
+  const rawCommand = userMessage.replace('@bot', '').trim();
+  
+  // --- ▼ここからが新しいコード▼ ---
+
+  // コマンドに「詳細」が含まれているかチェック
+  const isDetailed = rawCommand.includes('詳細');
+  
+  // チェック用のコマンド本体（"詳細"の文字を削除）
+  const command = rawCommand.replace('詳細', '').trim();
+  
+  // --- ▲ここまで▲ ---
+
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
   const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
 
@@ -58,7 +70,8 @@ function getReplyMessage(userMessage) {
         const garbageType = row[2];
         const notes = row[3];
         let reply = `今日のゴミは【${garbageType}】です。`;
-        if (notes && notes !== '-') {
+        // "詳細"が指定されていて、かつ注意事項があれば追加
+        if (isDetailed && notes && notes !== '-') {
           reply += `\n📝 注意事項：${notes}`;
         }
         return reply;
@@ -67,25 +80,23 @@ function getReplyMessage(userMessage) {
     return '今日のゴミ出し情報は見つかりませんでした。';
   }
 
-  // --- ▼ここからが新しいコード▼ ---
-
-  // 特定の曜日のコマンド（例: "月", "火曜"）
+  // 特定の曜日のコマンド
   for (const row of data) {
-    const searchKeys = row[1]; // B列の検索キー（例: "火,火曜"）
+    const searchKeys = row[1]; 
     if (searchKeys.includes(command)) {
-      const dayName = row[0]; // A列の曜日名
-      const garbageType = row[2]; // C列のゴミの種類
-      const notes = row[3]; // D列の注意事項
+      const dayName = row[0];
+      const garbageType = row[2];
+      const notes = row[3];
 
       let reply = `${dayName}のゴミは【${garbageType}】です。`;
-      if (notes && notes !== '-') {
+      // "詳細"が指定されていて、かつ注意事項があれば追加
+      if (isDetailed && notes && notes !== '-') {
         reply += `\n📝 注意事項：${notes}`;
       }
       return reply;
     }
   }
 
-  // どのコマンドにも当てはまらなかった場合
   return 'すみません、コマンドが分かりませんでした。\n「@bot 使い方」でヘルプを表示します。';
 }
 
