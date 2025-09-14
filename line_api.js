@@ -1,9 +1,12 @@
+// line_api.js
+
 /**
- * LINEにリプライメッセージを送信する共通関数
+ * LINE Messaging APIにリプライメッセージを送信する
  * @param {string} replyToken - リプライトークン
- * @param {Array<Object>} messages - 送信するメッセージオブジェクトの配列
+ * @param {Array<object>} messages - 送信するメッセージオブジェクトの配列
  */
 function replyToLine(replyToken, messages) {
+  // ... (ロジックは同じ、コメント整備)
   try {
     UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
       'headers': {
@@ -17,16 +20,17 @@ function replyToLine(replyToken, messages) {
       }),
     });
   } catch (e) {
-    writeLog('ERROR', `LINEへの返信でエラーが発生: ${e.message}`);
+    console.error(`LINEへの返信でエラーが発生: ${e.message}`);
   }
 }
 
 /**
  * ユーザーIDを基にLINEプロフィールを取得する
  * @param {string} userId - ユーザーID
- * @returns {object|null} - 成功すればプロフィールオブジェクト、失敗すればnull
+ * @returns {object|null} 成功すればプロフィールオブジェクト、失敗すればnull
  */
 function getUserProfile(userId) {
+  // ... (ロジックは同じ、コメント整備)
   try {
     const url = `https://api.line.me/v2/bot/profile/${userId}`;
     const response = UrlFetchApp.fetch(url, {
@@ -36,7 +40,7 @@ function getUserProfile(userId) {
     });
     return JSON.parse(response.getContentText());
   } catch (e) {
-    writeLog('ERROR', `ユーザープロフィールの取得に失敗: ${e.message}`);
+    console.error(`ユーザープロフィールの取得に失敗: ${e.message}`);
     return null;
   }
 }

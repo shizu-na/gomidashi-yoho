@@ -1,4 +1,8 @@
-// スプレッドシートの列インデックスを定数として定義 (両方のファイルから参照できるようにする)
+// spreadsheet.js
+
+/**
+ * スプレッドシートの列インデックスを管理する定数
+ */
 const COLUMN = {
   DAY_OF_WEEK: 0, // A列: 曜日
   SEARCH_KEY:  1, // B列: 検索キー
@@ -7,35 +11,41 @@ const COLUMN = {
 };
 
 /**
+ * マスター管理シートのオブジェクトを取得するヘルパー関数
+ * @returns {object} Sheetオブジェクト
+ */
+function getMasterSheet() {
+  const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
+  if (!MASTER_ID) {
+    console.error('MASTER_IDが設定されていません。');
+    return null;
+  }
+  return SpreadsheetApp.openById(MASTER_ID).getSheets()[0];
+}
+
+/**
  * GroupIDを基に、マスターシートから対応するスプレッドシートIDを検索して返す
  * @param {string} groupId - 検索対象のLINEグループID
  * @returns {string|null} - 見つかった場合はスプレッドシートID、見つからない場合はnull
  */
 function getSpreadsheetIdForGroup(groupId) {
+  // ... (ロジックは同じ、コメント整備)
   try {
-    const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
-    if (!MASTER_ID) {
-      writeLog('ERROR', 'MASTER_IDがスクリプトプロパティに設定されていません。');
-      return null;
-    }
+    const masterSheet = getMasterSheet();
+    if (!masterSheet) return null;
+    
+    const lastRow = masterSheet.getLastRow();
+    if (lastRow < 2) return null;
 
-    const sheet = SpreadsheetApp.openById(MASTER_ID).getSheets()[0]; // マスターシートの最初のシートを取得
-    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues(); // A列(GroupID)とB列(SpreadsheetID)を読み込む
-
-    // dataは二次元配列: [[groupId1, sheetId1], [groupId2, sheetId2], ...]
+    const data = masterSheet.getRange(2, 1, lastRow - 1, 2).getValues();
     for (const row of data) {
       if (row[0] === groupId) {
-        // GroupIDが一致したら、対応するSpreadsheetIDを返す
         return row[1]; 
       }
     }
-
-    // ループを抜けても見つからなかった場合
-    writeLog('INFO', `未登録のGroupIDからのアクセスです: ${groupId}`);
     return null;
-
   } catch (e) {
-    writeLog('ERROR', `getSpreadsheetIdForGroupでエラーが発生: ${e.message}`);
+    console.error(`getSpreadsheetIdForGroupでエラー: ${e.message}`);
     return null;
   }
 }
@@ -43,76 +53,41 @@ function getSpreadsheetIdForGroup(groupId) {
 /**
  * スプレッドシートからゴミ出しデータを取得して返す
  * @param {string} spreadsheetId - データを取得するスプレッドシートのID
- * @returns {Array<Array<string>>} - ゴミ出しスケジュールのデータ配列
+ * @returns {Array<Array<string>>} ゴミ出しスケジュールのデータ配列
  */
 function getGarbageData(spreadsheetId) {
+  // ... (ロジックは同じ、コメント整備)
   if (!spreadsheetId) return [];
-  
-  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-
-  // ▼「一番左にあるシート(0番目)」を取得するように変更
-  const sheet = spreadsheet.getSheets()[0]; 
-  
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-    return []; 
-  }
-  return sheet.getRange(2, 1, lastRow - 1, 4).getValues();
-}
-
-/**
- * ログシートにメッセージを記録する
- * @param {string} level - ログレベル (e.g., 'INFO', 'ERROR')
- * @param {string} message - 記録するメッセージ
- */
-function writeLog(level, message) {
   try {
-    const LOG_ID = PropertiesService.getScriptProperties().getProperty('LOG_ID');
-    if (!LOG_ID) {
-      console.error('LOG_IDが設定されていません。');
-      return; // LOG_IDがなければ処理を中断
-    }
-    const spreadsheet = SpreadsheetApp.openById(LOG_ID);
-    
-    // 「Log_2025-09」のような名前のシート名を生成
-    const now = new Date();
-    const sheetName = `Log_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    
-    let sheet = spreadsheet.getSheetByName(sheetName);
-    
-    // もし今月のシートがなければ、新しく作成する
-    if (!sheet) {
-      sheet = spreadsheet.insertSheet(sheetName, 0);
-      // 新しいシートの1行目にヘッダーを書き込む
-      sheet.appendRow(['タイムスタンプ', 'ログレベル', 'メッセージ', 'グループID']);
-    }
-    
-    // 最終行にログを追記 (GroupIDはまだ取得できないので空欄)
-    sheet.appendRow([now, level, message, '']);
-
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheets()[0];
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+    return sheet.getRange(2, 1, lastRow - 1, 4).getValues();
   } catch (e) {
-    // ログの書き込み自体に失敗した場合は、せめてGASのログに出力
-    console.error(`ログの書き込みに失敗しました: ${e.message}`);
+    // このエラーはユーザーに見せる必要があるため、ログには残しつつ空配列を返す
+    writeLog('ERROR', `ゴミ出しデータの取得に失敗: ${e.message}`);
+    return [];
   }
 }
+
 
 /**
  * ユーザーIDを基に、そのユーザーが登録者となっているグループIDのリストを返す
  * @param {string} userId - 検索対象のユーザーID
- * @returns {Array<string>} - 所属しているグループIDの配列
+ * @returns {Array<string>} 所属しているグループIDの配列
  */
 function getGroupsByUserId(userId) {
+  // ... (ロジックは同じ、コメント整備)
   try {
-    const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
-    const masterSheet = SpreadsheetApp.openById(MASTER_ID).getSheets()[0];
-    const data = masterSheet.getDataRange().getValues(); // シート全体のデータを取得
-    
+    const masterSheet = getMasterSheet();
+    if (!masterSheet) return [];
+
+    const data = masterSheet.getDataRange().getValues();
     const userGroups = [];
-    // 1行目はヘッダーなので i=1 からループ
     for (let i = 1; i < data.length; i++) {
-      // C列(インデックス2)のUserIDが一致するかチェック
-      if (data[i][2] === userId) {
-        userGroups.push(data[i][0]); // 一致したらA列(インデックス0)のGroupIDを配列に追加
+      if (data[i][2] === userId) { // C列(インデックス2)のUserID
+        userGroups.push(data[i][0]); // A列(インデックス0)のGroupID
       }
     }
     return userGroups;
@@ -128,31 +103,58 @@ function getGroupsByUserId(userId) {
  * @param {string} day - 更新対象の曜日 (例: '月曜')
  * @param {string} item - 新しい品目
  * @param {string} note - 新しい注意事項
- * @returns {boolean} - 成功すればtrue、失敗すればfalse
+ * @returns {boolean} 成功すればtrue、失敗すればfalse
  */
 function updateGarbageSchedule(groupId, day, item, note) {
+  // ... (ロジックは同じ、コメント整備)
   try {
     const spreadsheetId = getSpreadsheetIdForGroup(groupId);
     if (!spreadsheetId) return false;
 
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    const sheet = spreadsheet.getSheets()[0];
+    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheets()[0];
     const data = sheet.getDataRange().getValues();
 
-    // 更新対象の行を探す
-    for (let i = 1; i < data.length; i++) { // 1行目はヘッダーなので i=1 から
-      const searchKey = data[i][COLUMN.SEARCH_KEY]; // B列: 検索キー
+    for (let i = 1; i < data.length; i++) {
+      const searchKey = data[i][COLUMN.SEARCH_KEY];
       if (searchKey.includes(day.replace('曜', ''))) {
         const rowNum = i + 1;
-        // C列(品目)とD列(注意事項)を更新
         sheet.getRange(rowNum, COLUMN.GARBAGE_TYPE + 1).setValue(item);
         sheet.getRange(rowNum, COLUMN.NOTES + 1).setValue(note);
-        return true; // 更新成功
+        return true;
       }
     }
     return false; // 対象の曜日が見つからなかった
   } catch (e) {
     writeLog('ERROR', `スケジュール更新処理でエラー: ${e.message}`, groupId);
     return false;
+  }
+}
+
+
+/**
+ * ログシートにメッセージを記録する
+ * @param {string} level - ログレベル (e.g., 'INFO', 'ERROR')
+ * @param {string} message - 記録するメッセージ
+ * @param {string} [groupId=''] - 関連するグループID（任意）
+ */
+function writeLog(level, message, groupId = '') {
+  // ... (ロジックは同じ、コメント整備)
+  try {
+    const LOG_ID = PropertiesService.getScriptProperties().getProperty('LOG_ID');
+    if (!LOG_ID) {
+      console.error('LOG_IDが設定されていません。');
+      return;
+    }
+    const spreadsheet = SpreadsheetApp.openById(LOG_ID);
+    const now = new Date();
+    const sheetName = `Log_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(sheetName, 0);
+      sheet.appendRow(['タイムスタンプ', 'ログレベル', 'メッセージ', 'グループID']);
+    }
+    sheet.appendRow([now, level, message, groupId]);
+  } catch (e) {
+    console.error(`ログの書き込みに失敗しました: ${e.message}`);
   }
 }

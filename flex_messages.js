@@ -1,47 +1,47 @@
+// flex_messages.js
+
 /**
  * 「使い方」の静的なFlex Messageオブジェクトを返す
+ * @returns {object} LINE送信用Flex Messageオブジェクト
  */
 function getHelpFlexMessage() {
   return {
     "type": "flex",
-    "altText": "使い方ガイド",
+    "altText": MESSAGES.flex.helpAltText,
     "contents": helpMessageContents
   };
 }
 
+// flex_messages.js
+
+// flex_messages.js
+
 /**
  * 全曜日のスケジュール一覧Flex Messageを動的に生成する
  * @param {boolean} isDetailed - 詳細（注意事項）を含めるかどうか
- * @param {string} spreadsheetId - 使用するスプレッドシートのID
- * @returns {object} 
+ * @param {string} spreadsheetId - 対象スプレッドシートのID
+ * @returns {object} LINE送信用Flex Messageオブジェクト
  */
 function createScheduleFlexMessage(isDetailed, spreadsheetId) {
-    const data = getGarbageData(spreadsheetId); // ★共通関数でデータを取得
+  const data = getGarbageData(spreadsheetId);
+  if (data.length === 0) {
+    return { type: 'text', text: MESSAGES.query.sheetEmpty };
+  }
 
-    if (data.length === 0) {
-        return { type: 'text', text: 'ゴミ出し情報がシートに登録されていません。' };
-    }
+  const weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
+  data.sort((a, b) => weekdays.indexOf(a[COLUMN.DAY_OF_WEEK]) - weekdays.indexOf(b[COLUMN.DAY_OF_WEEK]));
 
-    // 曜日順ソート
-    const weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
-    data.sort((a, b) => weekdays.indexOf(a[COLUMN.DAY_OF_WEEK]) - weekdays.indexOf(b[COLUMN.DAY_OF_WEEK])); // ★COLUMN定数を利用
+  const bubbles = data.map(row => {
+    const day = row[COLUMN.DAY_OF_WEEK];
+    const item = row[COLUMN.GARBAGE_TYPE];
+    const note = row[COLUMN.NOTES] || '';
 
-    const bubbles = data.map(row => {
-        const day = row[COLUMN.DAY_OF_WEEK];   // ★COLUMN定数を利用
-        const item = row[COLUMN.GARBAGE_TYPE]; // ★COLUMN定数を利用
-        const note = row[COLUMN.NOTES] || '特記事項はありません。'; // ★COLUMN定数を利用
-
-    // body部分を動的に作成
-    const bodyContents = [
-      { "type": "text", "text": item, "wrap": true, "weight": "bold", "size": "md" }
-    ];
-
-    if (isDetailed && note) {
+    const bodyContents = [{ "type": "text", "text": item, "wrap": true, "weight": "bold", "size": "md" }];
+    if (isDetailed && note && note !== '-') {
       bodyContents.push({ "type": "separator", "margin": "lg" });
       bodyContents.push({ "type": "text", "text": note, "wrap": true });
     }
 
-    // bubble（カード1枚）の構造
     return {
       "type": "bubble",
       "size": "nano",
@@ -61,10 +61,9 @@ function createScheduleFlexMessage(isDetailed, spreadsheetId) {
     };
   });
 
-  // カルーセル全体の構造
   return {
     "type": "flex",
-    "altText": "ゴミ出しスケジュール一覧",
+    "altText": MESSAGES.flex.scheduleAltText,
     "contents": {
       "type": "carousel",
       "contents": bubbles
