@@ -2,8 +2,34 @@
 
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 
+/**
+ * LINEからのWebhookを受け取るメイン関数
+ */
 function doPost(e) {
   const event = JSON.parse(e.postData.contents).events[0];
+
+  // イベントタイプに応じて処理を振り分ける
+  switch (event.type) {
+    case 'message':
+      handleMessageEvent(event);
+      break;
+    case 'join':
+      handleJoinEvent(event);
+      break;
+    case 'follow':
+      handleFollowEvent(event);
+      break;
+    default:
+      // その他のイベントタイプは無視
+      break;
+  }
+}
+
+/**
+ * メッセージイベントを処理する
+ * @param {object} event - LINEイベントオブジェクト
+ */
+function handleMessageEvent(event) {
   const sourceType = event.source.type;
 
   if (sourceType === 'group') {
@@ -11,6 +37,34 @@ function doPost(e) {
   } else if (sourceType === 'user') {
     handlePersonalChat(event);
   }
+}
+
+/**
+ * グループ参加イベントを処理する
+ * @param {object} event - LINEイベントオブジェクト
+ */
+function handleJoinEvent(event) {
+  const replyToken = event.replyToken;
+  const message = {
+    type: 'text',
+    text: 'このグループに招待いただきありがとうございます！\n\nまずは、ゴミ出しスケジュールを管理するGoogleスプレッドシートを用意してください。\n詳しい使い方は「@bot 使い方」と送信してご確認ください。'
+  };
+  replyToLine(replyToken, [message]);
+  writeLog('INFO', 'Botが新しいグループに参加しました。', event.source.groupId);
+}
+
+/**
+ * フォローイベント（友だち追加）を処理する
+ * @param {object} event - LINEイベントオブジェクト
+ */
+function handleFollowEvent(event) {
+  const replyToken = event.replyToken;
+  const message = {
+    type: 'text',
+    text: '友だち追加ありがとうございます！\n\n私は、グループで使うゴミ出し日管理Botです。\nお手数ですが、私をグループに招待して、設定を行ってください。'
+  };
+  replyToLine(replyToken, [message]);
+  writeLog('INFO', 'Botが新しいユーザーにフォローされました。', event.source.userId);
 }
 
 function createReplyMessage(event, spreadsheetId) {
