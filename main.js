@@ -1,6 +1,5 @@
 // --- 設定項目 ---
 const SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-const SHEET_NAME = 'test'; // あなたのシート名に合わせてください
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 
 // スプレッドシートの列インデックスを定数として定義 (両方のファイルから参照できるようにする)
@@ -25,33 +24,24 @@ function doPost(e) {
   }
   
   const groupId = event.source.groupId;
+  const userId = event.source.userId; // userIdも取得
   const spreadsheetId = getSpreadsheetIdForGroup(groupId); // ★新しい関数でIDを取得
 
   // 未登録グループへの対応
-  if (!spreadsheetId && event.message.text !== '@bot 登録') { //「登録」コマンド以外は弾く
+  if (!spreadsheetId && !event.message.text.startsWith('@bot 登録')) { //「登録」で始まらないコマンドを弾く
      const unregisteredMessage = { type: 'text', text: 'このグループはまだ登録されていません。\n「@bot 使い方」と送信して、登録方法をご確認ください。' };
      replyToLine(replyToken, [unregisteredMessage]); // replyToLineは後で作成
      return;
   }
   
   const userMessage = event.message.text;
-  const replyMessage = createReplyMessage(userMessage, spreadsheetId); // ★spreadsheetIdを渡す
+  const replyMessage = createReplyMessage(event, spreadsheetId); // event全体を渡す
 
   if (!replyMessage) {
     return;
   }
 
-  UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
-    'headers': {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'Authorization': 'Bearer ' + CHANNEL_ACCESS_TOKEN,
-    },
-    'method': 'post',
-    'payload': JSON.stringify({
-      'replyToken': replyToken,
-      'messages': [replyMessage],
-    }),
-  });
+  replyToLine(replyToken, [replyMessage]);
 }
 
 /**
@@ -60,7 +50,9 @@ function doPost(e) {
  * @param {string} spreadsheetId - 使用するスプレッドシートのID
  * @returns {object | null} 
  */
-function createReplyMessage(userMessage, spreadsheetId) {
+function createReplyMessage(event, spreadsheetId) {
+  const userMessage = event.message.text;
+
   if (!userMessage.startsWith('@bot')) {
     return null;
   }
@@ -68,6 +60,36 @@ function createReplyMessage(userMessage, spreadsheetId) {
   const rawCommand = userMessage.replace('@bot', '').trim();
   const isDetailed = rawCommand.includes('詳細');
   const command = rawCommand.replace('詳細', '').trim();
+
+  // 5. グループ登録機能
+  if (command.startsWith('登録')) {
+    const sheetUrl = command.replace('登録', '').trim();
+    
+    // URLからスプレッドシートIDを抽出 (正規表現を使用)
+    const match = sheetUrl.match(/\/d\/(.+?)\//);
+    if (!sheetUrl || !match) {
+      return { type: 'text', text: '正しいスプレッドシートのURLを指定してください。\n例: @bot 登録 https://docs.google.com/spreadsheets/d/xxxxx/edit' };
+    }
+    const newSheetId = match[1];
+
+    const groupId = event.source.groupId;
+    const userId = event.source.userId;
+
+    try {
+      // マスターシートに新しいグループ情報を書き込む
+      const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
+      const masterSheet = SpreadsheetApp.openById(MASTER_ID).getSheets()[0];
+      masterSheet.appendRow([groupId, newSheetId, userId, '(GroupName)', new Date()]); // (GroupName)は後で取得する
+      
+      writeLog('INFO', `新しいグループが登録されました。GroupID: ${groupId}`);
+      
+      return { type: 'text', text: '✅ グループの登録が完了しました！\nさっそく「@bot 今日」と送って、ゴミ出し日を確認してみましょう。' };
+
+    } catch (e) {
+      writeLog('ERROR', `グループ登録処理でエラー: ${e.message}`);
+      return { type: 'text', text: 'エラーが発生しました。シートのURLが正しいか、Botが編集者として共有されているか確認してください。' };
+    }
+  }
 
   // Flex Messageを返すコマンド
   if (command === '全部') {
@@ -138,10 +160,14 @@ function createReplyMessage(userMessage, spreadsheetId) {
  * @param {string} spreadsheetId - データを取得するスプレッドシートのID
  * @returns {Array<Array<string>>} - ゴミ出しスケジュールのデータ配列
  */
-function getGarbageData(spreadsheetId) { // ← spreadsheetIdを引数で受け取る
-  if (!spreadsheetId) return []; // IDがなければ空配列を返す
+function getGarbageData(spreadsheetId) {
+  if (!spreadsheetId) return [];
+  
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
 
-  const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(SHEET_NAME); // ← 引数のIDを使う
+  // ▼「一番左にあるシート(0番目)」を取得するように変更
+  const sheet = spreadsheet.getSheets()[0]; 
+  
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) {
     return []; 
@@ -180,5 +206,64 @@ function getSpreadsheetIdForGroup(groupId) {
   } catch (e) {
     writeLog('ERROR', `getSpreadsheetIdForGroupでエラーが発生: ${e.message}`);
     return null;
+  }
+}
+
+/**
+ * LINEにリプライメッセージを送信する共通関数
+ * @param {string} replyToken - リプライトークン
+ * @param {Array<Object>} messages - 送信するメッセージオブジェクトの配列
+ */
+function replyToLine(replyToken, messages) {
+  try {
+    UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
+      'headers': {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Authorization': 'Bearer ' + CHANNEL_ACCESS_TOKEN,
+      },
+      'method': 'post',
+      'payload': JSON.stringify({
+        'replyToken': replyToken,
+        'messages': messages,
+      }),
+    });
+  } catch (e) {
+    writeLog('ERROR', `LINEへの返信でエラーが発生: ${e.message}`);
+  }
+}
+
+/**
+ * ログシートにメッセージを記録する
+ * @param {string} level - ログレベル (e.g., 'INFO', 'ERROR')
+ * @param {string} message - 記録するメッセージ
+ */
+function writeLog(level, message) {
+  try {
+    const LOG_ID = PropertiesService.getScriptProperties().getProperty('LOG_ID');
+    if (!LOG_ID) {
+      console.error('LOG_IDが設定されていません。');
+      return; // LOG_IDがなければ処理を中断
+    }
+    const spreadsheet = SpreadsheetApp.openById(LOG_ID);
+    
+    // 「Log_2025-09」のような名前のシート名を生成
+    const now = new Date();
+    const sheetName = `Log_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    let sheet = spreadsheet.getSheetByName(sheetName);
+    
+    // もし今月のシートがなければ、新しく作成する
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(sheetName, 0);
+      // 新しいシートの1行目にヘッダーを書き込む
+      sheet.appendRow(['タイムスタンプ', 'ログレベル', 'メッセージ', 'グループID']);
+    }
+    
+    // 最終行にログを追記 (GroupIDはまだ取得できないので空欄)
+    sheet.appendRow([now, level, message, '']);
+
+  } catch (e) {
+    // ログの書き込み自体に失敗した場合は、せめてGASのログに出力
+    console.error(`ログの書き込みに失敗しました: ${e.message}`);
   }
 }
