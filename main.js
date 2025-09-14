@@ -122,6 +122,20 @@ function createReplyMessage(event, spreadsheetId) {
     }
   }
 
+  // 9. データ変更機能 (グループから個人チャットへの誘導)
+  if (command === '変更') {
+    // このコマンドはグループチャットでのみ機能する
+    if (event.source.type === 'group') {
+      const userId = event.source.userId;
+      const userProfile = getUserProfile(userId);
+      const userName = userProfile ? userProfile.displayName : 'ユーザー'; // プロフィールが取得できなければ'ユーザー'とする
+
+      const guideMessage = `${userName}さん、ゴミ出しの予定を変更しますね！\n\nお手数ですが、このBotとの個人チャットを開き、もう一度「変更」と送信してください。`;
+      
+      return { type: 'text', text: guideMessage };
+    }
+  }
+
   // Flex Messageを返すコマンド
   if (command === '全部') {
     return createScheduleFlexMessage(isDetailed, spreadsheetId); // ★spreadsheetIdを渡す
@@ -296,5 +310,25 @@ function writeLog(level, message) {
   } catch (e) {
     // ログの書き込み自体に失敗した場合は、せめてGASのログに出力
     console.error(`ログの書き込みに失敗しました: ${e.message}`);
+  }
+}
+
+/**
+ * ユーザーIDを基にLINEプロフィールを取得する
+ * @param {string} userId - ユーザーID
+ * @returns {object|null} - 成功すればプロフィールオブジェクト、失敗すればnull
+ */
+function getUserProfile(userId) {
+  try {
+    const url = `https://api.line.me/v2/bot/profile/${userId}`;
+    const response = UrlFetchApp.fetch(url, {
+      'headers': {
+        'Authorization': 'Bearer ' + CHANNEL_ACCESS_TOKEN,
+      }
+    });
+    return JSON.parse(response.getContentText());
+  } catch (e) {
+    writeLog('ERROR', `ユーザープロフィールの取得に失敗: ${e.message}`);
+    return null;
   }
 }
