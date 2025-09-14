@@ -95,3 +95,64 @@ function writeLog(level, message) {
     console.error(`ログの書き込みに失敗しました: ${e.message}`);
   }
 }
+
+/**
+ * ユーザーIDを基に、そのユーザーが登録者となっているグループIDのリストを返す
+ * @param {string} userId - 検索対象のユーザーID
+ * @returns {Array<string>} - 所属しているグループIDの配列
+ */
+function getGroupsByUserId(userId) {
+  try {
+    const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
+    const masterSheet = SpreadsheetApp.openById(MASTER_ID).getSheets()[0];
+    const data = masterSheet.getDataRange().getValues(); // シート全体のデータを取得
+    
+    const userGroups = [];
+    // 1行目はヘッダーなので i=1 からループ
+    for (let i = 1; i < data.length; i++) {
+      // C列(インデックス2)のUserIDが一致するかチェック
+      if (data[i][2] === userId) {
+        userGroups.push(data[i][0]); // 一致したらA列(インデックス0)のGroupIDを配列に追加
+      }
+    }
+    return userGroups;
+  } catch (e) {
+    writeLog('ERROR', `ユーザーの所属グループ検索でエラー: ${e.message}`);
+    return [];
+  }
+}
+
+/**
+ * 特定のグループ・曜日のゴミ出し情報を更新する
+ * @param {string} groupId - 更新対象のグループID
+ * @param {string} day - 更新対象の曜日 (例: '月曜')
+ * @param {string} item - 新しい品目
+ * @param {string} note - 新しい注意事項
+ * @returns {boolean} - 成功すればtrue、失敗すればfalse
+ */
+function updateGarbageSchedule(groupId, day, item, note) {
+  try {
+    const spreadsheetId = getSpreadsheetIdForGroup(groupId);
+    if (!spreadsheetId) return false;
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheets()[0];
+    const data = sheet.getDataRange().getValues();
+
+    // 更新対象の行を探す
+    for (let i = 1; i < data.length; i++) { // 1行目はヘッダーなので i=1 から
+      const searchKey = data[i][COLUMN.SEARCH_KEY]; // B列: 検索キー
+      if (searchKey.includes(day.replace('曜', ''))) {
+        const rowNum = i + 1;
+        // C列(品目)とD列(注意事項)を更新
+        sheet.getRange(rowNum, COLUMN.GARBAGE_TYPE + 1).setValue(item);
+        sheet.getRange(rowNum, COLUMN.NOTES + 1).setValue(note);
+        return true; // 更新成功
+      }
+    }
+    return false; // 対象の曜日が見つからなかった
+  } catch (e) {
+    writeLog('ERROR', `スケジュール更新処理でエラー: ${e.message}`, groupId);
+    return false;
+  }
+}
