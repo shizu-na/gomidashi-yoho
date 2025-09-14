@@ -1,12 +1,12 @@
 // --- 設定項目 ---
 const SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
 const SHEET_NAME = 'test'; // あなたのシート名に合わせてください
+const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 
 /**
  * LINEからのWebhookを受け取るメイン関数
  */
 function doPost(e) {
-  const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
   const event = JSON.parse(e.postData.contents).events[0];
   const replyToken = event.replyToken;
   const userMessage = event.message.text;
@@ -52,8 +52,22 @@ function createReplyMessage(userMessage) {
     return getHelpFlexMessage();
   }
 
+  // スプレッドシートの列インデックスを定数として定義
+  const COLUMN = {
+    DAY_OF_WEEK: 0, // A列: 曜日
+    SEARCH_KEY:  1, // B列: 検索キー
+    GARBAGE_TYPE:2, // C列: ゴミの種類
+    NOTES:       3  // D列: 注意事項
+  };
+
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+  // getLastRow()が0の場合や1の場合にエラーになるのを防ぐ
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+      // データがない場合の処理
+      return { type: 'text', text: 'ゴミ出し情報がシートに登録されていません。' };
+  }
+  const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
   let replyText = '';
 
   // 「今日」または「きょう」のコマンド
@@ -62,9 +76,9 @@ function createReplyMessage(userMessage) {
     const dayOfWeek = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'][today.getDay()];
 
     for (const row of data) {
-      if (row[0] === dayOfWeek) {
-        const garbageType = row[2];
-        const notes = row[3];
+      if (row[COLUMN.DAY_OF_WEEK] === dayOfWeek) {
+        const garbageType = row[COLUMN.GARBAGE_TYPE];
+        const notes = row[COLUMN.NOTES];
         replyText = `今日のゴミは【${garbageType}】です。`;
         if (isDetailed && notes && notes !== '-') {
           replyText += `\n📝 注意事項：${notes}`;
