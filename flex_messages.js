@@ -12,10 +12,11 @@ function getHelpFlexMessage() {
 /**
  * 全曜日のスケジュール一覧Flex Messageを動的に生成する
  * @param {boolean} isDetailed - 詳細（注意事項）を含めるかどうか
- * @returns {object} - LINE送信用Flex Messageオブジェクト
+ * @param {string} spreadsheetId - 使用するスプレッドシートのID
+ * @returns {object} 
  */
-function createScheduleFlexMessage(isDetailed) {
-    const data = getGarbageData(); // ★共通関数でデータを取得
+function createScheduleFlexMessage(isDetailed, spreadsheetId) {
+    const data = getGarbageData(spreadsheetId); // ★共通関数でデータを取得
 
     if (data.length === 0) {
         return { type: 'text', text: 'ゴミ出し情報がシートに登録されていません。' };

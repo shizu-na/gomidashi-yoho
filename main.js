@@ -17,9 +17,25 @@ const COLUMN = {
 function doPost(e) {
   const event = JSON.parse(e.postData.contents).events[0];
   const replyToken = event.replyToken;
-  const userMessage = event.message.text;
+  const sourceType = event.source.type;
+  if (sourceType !== 'group') {
+    // 個人チャットや複数人チャットからのメッセージは一旦無視
+    // (将来的に個人チャットのセットアップ機能などをここに追加する)
+    return; 
+  }
+  
+  const groupId = event.source.groupId;
+  const spreadsheetId = getSpreadsheetIdForGroup(groupId); // ★新しい関数でIDを取得
 
-  const replyMessage = createReplyMessage(userMessage);
+  // 未登録グループへの対応
+  if (!spreadsheetId && event.message.text !== '@bot 登録') { //「登録」コマンド以外は弾く
+     const unregisteredMessage = { type: 'text', text: 'このグループはまだ登録されていません。\n「@bot 使い方」と送信して、登録方法をご確認ください。' };
+     replyToLine(replyToken, [unregisteredMessage]); // replyToLineは後で作成
+     return;
+  }
+  
+  const userMessage = event.message.text;
+  const replyMessage = createReplyMessage(userMessage, spreadsheetId); // ★spreadsheetIdを渡す
 
   if (!replyMessage) {
     return;
@@ -41,9 +57,10 @@ function doPost(e) {
 /**
  * ユーザーメッセージに応じて返信メッセージオブジェクトを生成する
  * @param {string} userMessage - ユーザーからのメッセージテキスト
- * @returns {object | null} - 送信するメッセージオブジェクト。返信不要の場合はnull
+ * @param {string} spreadsheetId - 使用するスプレッドシートのID
+ * @returns {object | null} 
  */
-function createReplyMessage(userMessage) {
+function createReplyMessage(userMessage, spreadsheetId) {
   if (!userMessage.startsWith('@bot')) {
     return null;
   }
@@ -54,20 +71,21 @@ function createReplyMessage(userMessage) {
 
   // Flex Messageを返すコマンド
   if (command === '全部') {
-    return createScheduleFlexMessage(isDetailed);
+    return createScheduleFlexMessage(isDetailed, spreadsheetId); // ★spreadsheetIdを渡す
   }
   if (command === '使い方' || command === 'ヘルプ') {
     return getHelpFlexMessage();
   }
 
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
-  // getLastRow()が0の場合や1の場合にエラーになるのを防ぐ
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) {
-      // データがない場合の処理
-      return { type: 'text', text: 'ゴミ出し情報がシートに登録されていません。' };
+  // 1. spreadsheetIdを使って、共通関数からデータを取得する
+  const data = getGarbageData(spreadsheetId); 
+  
+  // 2. 取得したデータが空配列かどうかで、シートに中身があるかを判断する
+  if (data.length === 0) {
+    return { type: 'text', text: 'ゴミ出し情報がシートに登録されていません。' };
   }
-  const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  
+  // 3. データがあれば、以降の処理に進む
   let replyText = '';
 
   // 「今日」または「きょう」のコマンド
@@ -117,13 +135,50 @@ function createReplyMessage(userMessage) {
 
 /**
  * スプレッドシートからゴミ出しデータを取得して返す
+ * @param {string} spreadsheetId - データを取得するスプレッドシートのID
  * @returns {Array<Array<string>>} - ゴミ出しスケジュールのデータ配列
  */
-function getGarbageData() {
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+function getGarbageData(spreadsheetId) { // ← spreadsheetIdを引数で受け取る
+  if (!spreadsheetId) return []; // IDがなければ空配列を返す
+
+  const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(SHEET_NAME); // ← 引数のIDを使う
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) {
-    return []; // データがない場合は空の配列を返す
+    return []; 
   }
   return sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+}
+
+/**
+ * GroupIDを基に、マスターシートから対応するスプレッドシートIDを検索して返す
+ * @param {string} groupId - 検索対象のLINEグループID
+ * @returns {string|null} - 見つかった場合はスプレッドシートID、見つからない場合はnull
+ */
+function getSpreadsheetIdForGroup(groupId) {
+  try {
+    const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
+    if (!MASTER_ID) {
+      writeLog('ERROR', 'MASTER_IDがスクリプトプロパティに設定されていません。');
+      return null;
+    }
+
+    const sheet = SpreadsheetApp.openById(MASTER_ID).getSheets()[0]; // マスターシートの最初のシートを取得
+    const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues(); // A列(GroupID)とB列(SpreadsheetID)を読み込む
+
+    // dataは二次元配列: [[groupId1, sheetId1], [groupId2, sheetId2], ...]
+    for (const row of data) {
+      if (row[0] === groupId) {
+        // GroupIDが一致したら、対応するSpreadsheetIDを返す
+        return row[1]; 
+      }
+    }
+
+    // ループを抜けても見つからなかった場合
+    writeLog('INFO', `未登録のGroupIDからのアクセスです: ${groupId}`);
+    return null;
+
+  } catch (e) {
+    writeLog('ERROR', `getSpreadsheetIdForGroupでエラーが発生: ${e.message}`);
+    return null;
+  }
 }
