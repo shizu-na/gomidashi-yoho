@@ -3,6 +3,14 @@ const SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty('SPRE
 const SHEET_NAME = 'test'; // あなたのシート名に合わせてください
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 
+// スプレッドシートの列インデックスを定数として定義 (両方のファイルから参照できるようにする)
+const COLUMN = {
+  DAY_OF_WEEK: 0, // A列: 曜日
+  SEARCH_KEY:  1, // B列: 検索キー
+  GARBAGE_TYPE:2, // C列: ゴミの種類
+  NOTES:       3  // D列: 注意事項
+};
+
 /**
  * LINEからのWebhookを受け取るメイン関数
  */
@@ -51,14 +59,6 @@ function createReplyMessage(userMessage) {
   if (command === '使い方' || command === 'ヘルプ') {
     return getHelpFlexMessage();
   }
-
-  // スプレッドシートの列インデックスを定数として定義
-  const COLUMN = {
-    DAY_OF_WEEK: 0, // A列: 曜日
-    SEARCH_KEY:  1, // B列: 検索キー
-    GARBAGE_TYPE:2, // C列: ゴミの種類
-    NOTES:       3  // D列: 注意事項
-  };
 
   const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
   // getLastRow()が0の場合や1の場合にエラーになるのを防ぐ
@@ -113,4 +113,17 @@ function createReplyMessage(userMessage) {
   
   const fallbackText = 'すみません、コマンドが分かりませんでした。\n「@bot 使い方」でヘルプを表示します。';
   return { type: 'text', text: fallbackText };
+}
+
+/**
+ * スプレッドシートからゴミ出しデータを取得して返す
+ * @returns {Array<Array<string>>} - ゴミ出しスケジュールのデータ配列
+ */
+function getGarbageData() {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return []; // データがない場合は空の配列を返す
+  }
+  return sheet.getRange(2, 1, lastRow - 1, 4).getValues();
 }

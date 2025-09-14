@@ -2,7 +2,76 @@
  * 「使い方」の静的なFlex Messageオブジェクトを返す
  */
 function getHelpFlexMessage() {
-    const helpMessageContents = {
+  return {
+    "type": "flex",
+    "altText": "使い方ガイド",
+    "contents": helpMessageContents
+  };
+}
+
+/**
+ * 全曜日のスケジュール一覧Flex Messageを動的に生成する
+ * @param {boolean} isDetailed - 詳細（注意事項）を含めるかどうか
+ * @returns {object} - LINE送信用Flex Messageオブジェクト
+ */
+function createScheduleFlexMessage(isDetailed) {
+    const data = getGarbageData(); // ★共通関数でデータを取得
+
+    if (data.length === 0) {
+        return { type: 'text', text: 'ゴミ出し情報がシートに登録されていません。' };
+    }
+
+    // 曜日順ソート
+    const weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
+    data.sort((a, b) => weekdays.indexOf(a[COLUMN.DAY_OF_WEEK]) - weekdays.indexOf(b[COLUMN.DAY_OF_WEEK])); // ★COLUMN定数を利用
+
+    const bubbles = data.map(row => {
+        const day = row[COLUMN.DAY_OF_WEEK];   // ★COLUMN定数を利用
+        const item = row[COLUMN.GARBAGE_TYPE]; // ★COLUMN定数を利用
+        const note = row[COLUMN.NOTES] || '特記事項はありません。'; // ★COLUMN定数を利用
+
+    // body部分を動的に作成
+    const bodyContents = [
+      { "type": "text", "text": item, "wrap": true, "weight": "bold", "size": "md" }
+    ];
+
+    if (isDetailed && note) {
+      bodyContents.push({ "type": "separator", "margin": "lg" });
+      bodyContents.push({ "type": "text", "text": note, "wrap": true });
+    }
+
+    // bubble（カード1枚）の構造
+    return {
+      "type": "bubble",
+      "size": "nano",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [{ "type": "text", "text": day, "weight": "bold", "size": "xl", "color": "#176FB8", "align": "center" }],
+        "paddingAll": "10px",
+        "backgroundColor": "#f0f8ff"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "md",
+        "contents": bodyContents
+      }
+    };
+  });
+
+  // カルーセル全体の構造
+  return {
+    "type": "flex",
+    "altText": "ゴミ出しスケジュール一覧",
+    "contents": {
+      "type": "carousel",
+      "contents": bubbles
+    }
+  };
+}
+
+const helpMessageContents = {
     "type": "carousel",
     "contents": [
         {
@@ -189,70 +258,4 @@ function getHelpFlexMessage() {
             }
         }
     ]
-}
-
-  return {
-    "type": "flex",
-    "altText": "使い方ガイド",
-    "contents": helpMessageContents
-  };
-}
-
-/**
- * 全曜日のスケジュール一覧Flex Messageを動的に生成する
- * @param {boolean} isDetailed - 詳細（注意事項）を含めるかどうか
- * @returns {object} - LINE送信用Flex Messageオブジェクト
- */
-function createScheduleFlexMessage(isDetailed) {
-  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
-  const data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
-
-  // Pythonの曜日順ソートを再現
-  const weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
-  data.sort((a, b) => weekdays.indexOf(a[0]) - weekdays.indexOf(b[0]));
-
-  const bubbles = data.map(row => {
-    const day = row[0];
-    const item = row[2];
-    const note = row[3] || '特記事項はありません。';
-
-    // body部分を動的に作成
-    const bodyContents = [
-      { "type": "text", "text": item, "wrap": true, "weight": "bold", "size": "md" }
-    ];
-
-    if (isDetailed && note) {
-      bodyContents.push({ "type": "separator", "margin": "lg" });
-      bodyContents.push({ "type": "text", "text": note, "wrap": true });
-    }
-
-    // bubble（カード1枚）の構造
-    return {
-      "type": "bubble",
-      "size": "nano",
-      "header": {
-        "type": "box",
-        "layout": "vertical",
-        "contents": [{ "type": "text", "text": day, "weight": "bold", "size": "xl", "color": "#176FB8", "align": "center" }],
-        "paddingAll": "10px",
-        "backgroundColor": "#f0f8ff"
-      },
-      "body": {
-        "type": "box",
-        "layout": "vertical",
-        "spacing": "md",
-        "contents": bodyContents
-      }
-    };
-  });
-
-  // カルーセル全体の構造
-  return {
-    "type": "flex",
-    "altText": "ゴミ出しスケジュール一覧",
-    "contents": {
-      "type": "carousel",
-      "contents": bubbles
-    }
-  };
-}
+};
