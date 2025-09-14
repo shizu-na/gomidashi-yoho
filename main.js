@@ -61,6 +61,37 @@ function createReplyMessage(event, spreadsheetId) {
   const isDetailed = rawCommand.includes('詳細');
   const command = rawCommand.replace('詳細', '').trim();
 
+  // 8. 登録解除機能
+  if (command === '登録解除') {
+    const groupId = event.source.groupId;
+    
+    try {
+      const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
+      const masterSheet = SpreadsheetApp.openById(MASTER_ID).getSheets()[0];
+      const data = masterSheet.getRange("A:A").getValues(); // A列(GroupID)を全て取得
+
+      let rowToDelete = -1;
+      for (let i = 0; i < data.length; i++) {
+        if (data[i][0] === groupId) {
+          rowToDelete = i + 1; // 配列のインデックスは0から、行番号は1からなので+1
+          break;
+        }
+      }
+
+      if (rowToDelete !== -1) {
+        masterSheet.deleteRow(rowToDelete);
+        writeLog('INFO', `グループの登録が解除されました。GroupID: ${groupId}`);
+        return { type: 'text', text: '✅ このグループの登録を解除しました。' };
+      } else {
+        // マスターシートにGroupIDが見つからなかった場合
+        return { type: 'text', text: 'このグループは登録されていないようです。' };
+      }
+
+    } catch (e) {
+      writeLog('ERROR', `グループ解除処理でエラー: ${e.message}`);
+      return { type: 'text', text: 'エラーが発生しました。時間をおいて再度お試しください。' };
+    }
+  }
   // 5. グループ登録機能
   if (command.startsWith('登録')) {
     const sheetUrl = command.replace('登録', '').trim();

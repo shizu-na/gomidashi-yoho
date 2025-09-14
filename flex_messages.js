@@ -76,6 +76,68 @@ const helpMessageContents = {
     "type": "carousel",
     "contents": [
         {
+        "type": "bubble",
+        "size": "deca",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+            {
+                "type": "text",
+                "text": "設定・管理",
+                "color": "#FFFFFF",
+                "weight": "bold",
+                "align": "center",
+                "size": "lg"
+            }
+            ],
+            "backgroundColor": "#6C757D", 
+            "paddingAll": "10px"
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+            {
+                "type": "text",
+                "text": "● グループを登録・更新",
+                "weight": "bold",
+                "size": "md",
+                "wrap": true
+            },
+            {
+                "type": "text",
+                "text": "「@bot 登録 <URL>」\nURLはスプレッドシートのもの",
+                "align": "center",
+                "wrap": true,
+                "margin": "md",
+                "size": "sm"
+            },
+            {
+                "type": "separator",
+                "margin": "xl"
+            },
+            {
+                "type": "text",
+                "text": "● グループの登録を解除",
+                "weight": "bold",
+                "margin": "lg",
+                "size": "md",
+                "wrap": true
+            },
+            {
+                "type": "text",
+                "text": "「@bot 登録解除」",
+                "align": "center",
+                "wrap": true,
+                "margin": "md"
+            }
+            ],
+            "paddingAll": "15px",
+            "spacing": "sm"
+        }
+        },
+        {
             "type": "bubble",
             "size": "deca",
             "header": {
