@@ -158,3 +158,31 @@ function writeLog(level, message, groupId = '') {
     console.error(`ログの書き込みに失敗しました: ${e.message}`);
   }
 }
+
+// spreadsheet.js に追加
+
+/**
+ * ユーザーのシートにヘッダー行を自動で書き込む
+ * @param {object} sheet - 対象のSheetオブジェクト
+ */
+function initializeSheetHeaders(sheet) {
+  // シートが完全に空の場合のみヘッダーを書き込む
+  if (sheet.getLastRow() === 0) {
+    const headers = ['曜日', '検索キー', 'ゴミの種類', '注意事項'];
+    sheet.appendRow(headers);
+    // 列の幅を自動調整して見やすくする
+    sheet.autoResizeColumns(1, headers.length);
+  }
+}
+
+/**
+ * シートのヘッダー行（1行目）を編集できないように保護する
+ * @param {object} sheet - 対象のSheetオブジェクト
+ */
+function protectHeaderRow(sheet) {
+  const protection = sheet.getRange('1:1').protect();
+  
+  // 保護の設定
+  protection.setDescription('ヘッダー行はBotが使用するため編集できません。');
+  protection.setWarningOnly(true); // 編集しようとすると警告を出す
+}

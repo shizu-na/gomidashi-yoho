@@ -19,6 +19,7 @@ const MESSAGES = {
   // 登録
   registration: {
     success: '✅ グループの登録が完了しました！\nさっそく「@bot 今日」と送って、ゴミ出し日を確認してみましょう。',
+    updateSuccess: '✅ 登録されているスプレッドシートを更新しました。', // ★この行を追加
     invalidUrl: '正しいスプレッドシートのURLを指定してください。\n例: @bot 登録 https://docs.google.com/spreadsheets/d/xxxxx/edit',
     error: 'エラーが発生しました。シートのURLが正しいか、Botが編集者として共有されているか確認してください。',
   },

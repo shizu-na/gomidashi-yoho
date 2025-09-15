@@ -30,13 +30,14 @@ function handleUnregistration(event) {
   }
 }
 
+// commands.js
+
 /**
- * グループ登録コマンドを処理する
+ * グループ登録コマンドを処理する（新規登録と更新の両方に対応）
  * @param {object} event - LINEイベントオブジェクト
  * @returns {object} 送信するメッセージオブジェクト
  */
 function handleRegistration(event) {
-  // ... (ロジックはほぼ同じ、メッセージ部分をMESSAGES参照に変更)
   const userMessage = event.message.text;
   const groupId = event.source.groupId;
   const command = userMessage.replace('@bot', '').replace('登録', '').trim();
@@ -51,16 +52,46 @@ function handleRegistration(event) {
 
   try {
     const masterSheet = getMasterSheet();
-    // TODO: 登録済みの場合の更新処理
-    masterSheet.appendRow([groupId, newSheetId, userId, '(GroupName)', new Date()]);
-    writeLog('INFO', `新規グループ登録`, groupId);
-    return { type: 'text', text: MESSAGES.registration.success };
+    const data = masterSheet.getRange("A:A").getValues();
+    let existingRow = -1;
+
+    // 登録済みかチェック
+    for (let i = 0; i < data.length; i++) {
+      if (data[i][0] === groupId) {
+        existingRow = i + 1; // 行番号はインデックス+1
+        break;
+      }
+    }
+
+    let successMessage;
+
+    if (existingRow !== -1) {
+      // --- 更新処理 ---
+      masterSheet.getRange(existingRow, 2).setValue(newSheetId); // B列(SheetID)を更新
+      masterSheet.getRange(existingRow, 3).setValue(userId);     // C列(UserID)を更新
+      masterSheet.getRange(existingRow, 4).setValue(new Date());  // D列(Timestamp)を更新
+      writeLog('INFO', `グループ情報更新`, groupId);
+      successMessage = { type: 'text', text: MESSAGES.registration.updateSuccess };
+    } else {
+      // --- 新規登録処理 ---
+      masterSheet.appendRow([groupId, newSheetId, userId, new Date()]);
+      writeLog('INFO', `新規グループ登録`, groupId);
+      successMessage = { type: 'text', text: MESSAGES.registration.success };
+    }
+
+    // ユーザーのシートへのテンプレート作成処理は、新規・更新どちらの場合も実行
+    const userSpreadsheet = SpreadsheetApp.openById(newSheetId);
+    const userSheet = userSpreadsheet.getSheets()[0];
+    initializeSheetHeaders(userSheet);
+    protectHeaderRow(userSheet);
+
+    return successMessage;
+
   } catch (e) {
     writeLog('ERROR', `グループ登録処理: ${e.message}`, groupId);
     return { type: 'text', text: MESSAGES.registration.error };
   }
 }
-
 
 /**
  * グループチャットでの「変更」コマンド（個人チャットへの誘導）を処理する
