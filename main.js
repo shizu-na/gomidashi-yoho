@@ -81,13 +81,23 @@ function handleGroupChat(event) {
 }
 
 /**
- * 個人チャットでのメッセージイベント（対話機能）を処理する
+ * 個人チャットでのメッセージイベントを処理する
  * @param {object} event - LINEイベントオブジェクト
  */
 function handlePersonalChat(event) {
   const replyToken = event.replyToken;
   const userId = event.source.userId;
   const userMessage = event.message.text;
+
+  // @botで始まるコマンドは、createReplyMessageに処理を任せる
+  if (userMessage.startsWith('@bot')) {
+    const replyMessages = createReplyMessage(event, null); // 個人チャットではspreadsheetIdは不要
+    if (replyMessages) {
+      replyToLine(replyToken, replyMessages);
+    }
+    return;
+  }
+  
   const cache = CacheService.getUserCache();
   const cachedState = cache.get(userId);
 

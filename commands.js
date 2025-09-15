@@ -30,16 +30,19 @@ function handleUnregistration(event) {
   }
 }
 
-// commands.js
-
 /**
- * グループ登録コマンドを処理する（新規登録と更新の両方に対応）
+ * グループまたは個人の登録・更新コマンドを処理する
  * @param {object} event - LINEイベントオブジェクト
  * @returns {object} 送信するメッセージオブジェクト
  */
 function handleRegistration(event) {
   const userMessage = event.message.text;
-  const groupId = event.source.groupId;
+  const sourceType = event.source.type;
+  
+  // 登録元（グループ or ユーザー）に応じてIDとタイプを決定
+  const ownerId = (sourceType === 'group') ? event.source.groupId : event.source.userId;
+  const type = sourceType; // 'group' or 'user'
+
   const command = userMessage.replace('@bot', '').replace('登録', '').trim();
   const sheetUrl = command;
 
@@ -48,16 +51,16 @@ function handleRegistration(event) {
     return { type: 'text', text: MESSAGES.registration.invalidUrl };
   }
   const newSheetId = match[1];
-  const userId = event.source.userId;
+  const registeredByUserId = event.source.userId;
 
   try {
     const masterSheet = getMasterSheet();
-    const data = masterSheet.getRange("A:A").getValues();
+    const data = masterSheet.getRange("A:A").getValues(); // A列(OwnerID)を全て取得
     let existingRow = -1;
 
     // 登録済みかチェック
     for (let i = 0; i < data.length; i++) {
-      if (data[i][0] === groupId) {
+      if (data[i][0] === ownerId) {
         existingRow = i + 1; // 行番号はインデックス+1
         break;
       }
@@ -67,19 +70,21 @@ function handleRegistration(event) {
 
     if (existingRow !== -1) {
       // --- 更新処理 ---
-      masterSheet.getRange(existingRow, 2).setValue(newSheetId); // B列(SheetID)を更新
-      masterSheet.getRange(existingRow, 3).setValue(userId);     // C列(UserID)を更新
-      masterSheet.getRange(existingRow, 4).setValue(new Date());  // D列(Timestamp)を更新
-      writeLog('INFO', `グループ情報更新`, groupId);
+      // B:Type, C:SpreadsheetID, D:RegisteredByUserID, E:Timestamp
+      masterSheet.getRange(existingRow, 2).setValue(type);
+      masterSheet.getRange(existingRow, 3).setValue(newSheetId);
+      masterSheet.getRange(existingRow, 4).setValue(registeredByUserId);
+      masterSheet.getRange(existingRow, 5).setValue(new Date());
+      writeLog('INFO', `情報更新 (${type})`, ownerId);
       successMessage = { type: 'text', text: MESSAGES.registration.updateSuccess };
     } else {
       // --- 新規登録処理 ---
-      masterSheet.appendRow([groupId, newSheetId, userId, new Date()]);
-      writeLog('INFO', `新規グループ登録`, groupId);
+      masterSheet.appendRow([ownerId, type, newSheetId, registeredByUserId, new Date()]);
+      writeLog('INFO', `新規登録 (${type})`, ownerId);
       successMessage = { type: 'text', text: MESSAGES.registration.success };
     }
 
-    // ユーザーのシートへのテンプレート作成処理は、新規・更新どちらの場合も実行
+    // ユーザーシートへのテンプレート作成処理
     const userSpreadsheet = SpreadsheetApp.openById(newSheetId);
     const userSheet = userSpreadsheet.getSheets()[0];
     initializeSheetHeaders(userSheet);
@@ -88,7 +93,7 @@ function handleRegistration(event) {
     return successMessage;
 
   } catch (e) {
-    writeLog('ERROR', `グループ登録処理: ${e.message}`, groupId);
+    writeLog('ERROR', `登録処理 (${type}): ${e.message}`, ownerId);
     return { type: 'text', text: MESSAGES.registration.error };
   }
 }
