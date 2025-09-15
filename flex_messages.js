@@ -2,7 +2,6 @@
 
 /**
  * 「使い方」の静的なFlex Messageオブジェクトを返す
- * @returns {object} LINE送信用Flex Messageオブジェクト
  */
 function getHelpFlexMessage() {
   return {
@@ -11,10 +10,6 @@ function getHelpFlexMessage() {
     "contents": helpMessageContents
   };
 }
-
-// flex_messages.js
-
-// flex_messages.js
 
 /**
  * 全曜日のスケジュール一覧Flex Messageを動的に生成する
@@ -48,7 +43,7 @@ function createScheduleFlexMessage(isDetailed, spreadsheetId) {
       "header": {
         "type": "box",
         "layout": "vertical",
-        "contents": [{ "type": "text", "text": day, "weight": "bold", "size": "xl", "color": "#176FB8", "align": "center" }],
+        "contents": [{ "type": "text", "text": day.replace('曜日', ''), "weight": "bold", "size": "xl", "color": "#176FB8", "align": "center" }],
         "paddingAll": "10px",
         "backgroundColor": "#f0f8ff"
       },
@@ -75,68 +70,6 @@ const helpMessageContents = {
     "type": "carousel",
     "contents": [
         {
-        "type": "bubble",
-        "size": "deca",
-        "header": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "設定・管理",
-                "color": "#FFFFFF",
-                "weight": "bold",
-                "align": "center",
-                "size": "lg"
-            }
-            ],
-            "backgroundColor": "#6C757D", 
-            "paddingAll": "10px"
-        },
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-            {
-                "type": "text",
-                "text": "● グループを登録・更新",
-                "weight": "bold",
-                "size": "md",
-                "wrap": true
-            },
-            {
-                "type": "text",
-                "text": "「@bot 登録 <URL>」\nURLはスプレッドシートのもの",
-                "align": "center",
-                "wrap": true,
-                "margin": "md",
-                "size": "sm"
-            },
-            {
-                "type": "separator",
-                "margin": "xl"
-            },
-            {
-                "type": "text",
-                "text": "● グループの登録を解除",
-                "weight": "bold",
-                "margin": "lg",
-                "size": "md",
-                "wrap": true
-            },
-            {
-                "type": "text",
-                "text": "「@bot 登録解除」",
-                "align": "center",
-                "wrap": true,
-                "margin": "md"
-            }
-            ],
-            "paddingAll": "15px",
-            "spacing": "sm"
-        }
-        },
-        {
             "type": "bubble",
             "size": "deca",
             "header": {
@@ -145,14 +78,14 @@ const helpMessageContents = {
                 "contents": [
                     {
                         "type": "text",
-                        "text": "確認（基本）",
+                        "text": "設定・管理",
                         "color": "#FFFFFF",
                         "weight": "bold",
                         "align": "center",
                         "size": "lg"
                     }
                 ],
-                "backgroundColor": "#176FB8",
+                "backgroundColor": "#6C757D",
                 "paddingAll": "10px"
             },
             "body": {
@@ -161,17 +94,18 @@ const helpMessageContents = {
                 "contents": [
                     {
                         "type": "text",
-                        "text": "● 品目のみ確認",
+                        "text": "● 利用開始（シート登録）",
                         "weight": "bold",
                         "size": "md",
                         "wrap": true
                     },
                     {
                         "type": "text",
-                        "text": "「@bot 今日」\n「@bot 月曜」",
+                        "text": "「@bot 登録 <URL>」\nURLはスプレッドシートのもの",
                         "align": "center",
                         "wrap": true,
-                        "margin": "md"
+                        "margin": "md",
+                        "size": "sm"
                     },
                     {
                         "type": "separator",
@@ -179,7 +113,7 @@ const helpMessageContents = {
                     },
                     {
                         "type": "text",
-                        "text": "● 詳細も確認",
+                        "text": "● 登録の解除",
                         "weight": "bold",
                         "margin": "lg",
                         "size": "md",
@@ -187,7 +121,7 @@ const helpMessageContents = {
                     },
                     {
                         "type": "text",
-                        "text": "「@bot 月曜 詳細」",
+                        "text": "「@bot 登録解除」",
                         "align": "center",
                         "wrap": true,
                         "margin": "md"
@@ -206,7 +140,68 @@ const helpMessageContents = {
                 "contents": [
                     {
                         "type": "text",
-                        "text": "確認（一覧表示）",
+                        "text": "予定の確認",
+                        "color": "#FFFFFF",
+                        "weight": "bold",
+                        "align": "center",
+                        "size": "lg"
+                    }
+                ],
+                "backgroundColor": "#176FB8",
+                "paddingAll": "10px"
+            },
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "● 今日のゴミを確認",
+                        "weight": "bold",
+                        "size": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「@bot 今日」\n「@bot 今日 詳細」",
+                        "align": "center",
+                        "wrap": true,
+                        "margin": "md"
+                    },
+                    {
+                        "type": "separator",
+                        "margin": "xl"
+                    },
+                    {
+                        "type": "text",
+                        "text": "● 特定の曜日を確認",
+                        "weight": "bold",
+                        "margin": "lg",
+                        "size": "md",
+                        "wrap": true
+                    },
+                    {
+                        "type": "text",
+                        "text": "「@bot 月曜」\n「@bot 火曜 詳細」",
+                        "align": "center",
+                        "wrap": true,
+                        "margin": "md"
+                    }
+                ],
+                "paddingAll": "15px",
+                "spacing": "sm"
+            }
+        },
+        {
+            "type": "bubble",
+            "size": "deca",
+            "header": {
+                "type": "box",
+                "layout": "vertical",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "予定の一覧表示",
                         "color": "#FFFFFF",
                         "weight": "bold",
                         "align": "center",
@@ -222,7 +217,7 @@ const helpMessageContents = {
                 "contents": [
                     {
                         "type": "text",
-                        "text": "● 全ての品目を確認",
+                        "text": "● 全ての予定を確認",
                         "weight": "bold",
                         "size": "md",
                         "wrap": true
@@ -248,7 +243,7 @@ const helpMessageContents = {
                     },
                     {
                         "type": "text",
-                        "text": "「@bot 詳細 全部」",
+                        "text": "「@bot 全部 詳細」",
                         "align": "center",
                         "margin": "md",
                         "wrap": true
@@ -267,7 +262,7 @@ const helpMessageContents = {
                 "contents": [
                     {
                         "type": "text",
-                        "text": "変更（個人チャット）",
+                        "text": "予定の変更",
                         "size": "lg",
                         "color": "#FFFFFF",
                         "weight": "bold",
@@ -283,14 +278,14 @@ const helpMessageContents = {
                 "contents": [
                     {
                         "type": "text",
-                        "text": "● 品目 or 注意事項を変更",
+                        "text": "● 対話形式で変更",
                         "size": "md",
                         "weight": "bold",
                         "wrap": true
                     },
                     {
                         "type": "text",
-                        "text": "「変更 品目 月」\n「変更 品目 全部」\n「変更 注意事項 木」",
+                        "text": "「変更」と送信\n（@bot は不要です）",
                         "margin": "md",
                         "align": "center",
                         "wrap": true
@@ -301,7 +296,7 @@ const helpMessageContents = {
                     },
                     {
                         "type": "text",
-                        "text": "● 両方まとめて変更",
+                        "text": "● その他",
                         "size": "md",
                         "weight": "bold",
                         "margin": "lg",
@@ -309,7 +304,7 @@ const helpMessageContents = {
                     },
                     {
                         "type": "text",
-                        "text": "「変更 火曜 詳細」",
+                        "text": "「@bot 使い方」で\nこのガイドを再度表示",
                         "align": "center",
                         "margin": "md",
                         "wrap": true

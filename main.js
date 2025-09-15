@@ -13,11 +13,11 @@ function doPost(e) {
   // イベントタイプに応じて処理を振り分ける
   switch (event.type) {
     case 'message':
-      handleMessageEvent(event);
+      handleMessage(event); // ★ 変更: 新しい統合関数を呼び出す
       break;
-    case 'join':
-      handleJoinEvent(event);
-      break;
+    // case 'join': // ★ 削除: グループ参加イベントは不要
+    //   handleJoinEvent(event);
+    //   break;
     case 'follow':
       handleFollowEvent(event);
       break;
@@ -25,129 +25,97 @@ function doPost(e) {
 }
 
 /**
- * メッセージイベントをタイプ（グループ/個人）に応じて振り分ける
+ * ★ 修正: 全てのメッセージイベントを処理する
  * @param {object} event - LINEイベントオブジェクト
  */
-function handleMessageEvent(event) {
-  const sourceType = event.source.type;
-  if (sourceType === 'group') {
-    handleGroupChat(event);
-  } else if (sourceType === 'user') {
-    handlePersonalChat(event);
-  }
-}
-
-/**
- * グループ参加イベントを処理する
- * @param {object} event - LINEイベントオブジェクト
- */
-function handleJoinEvent(event) {
-  const replyToken = event.replyToken;
-  const message = { type: 'text', text: MESSAGES.event.join };
-  replyToLine(replyToken, [message]);
-  writeLog('INFO', 'Botが新しいグループに参加しました。', event.source.groupId);
-}
-
-/**
- * フォロー（友だち追加）イベントを処理する
- * @param {object} event - LINEイベントオブジェクト
- */
-function handleFollowEvent(event) {
-  const replyToken = event.replyToken;
-  const message = { type: 'text', text: MESSAGES.event.follow };
-  replyToLine(replyToken, [message]);
-  writeLog('INFO', 'Botが新しいユーザーにフォローされました。', event.source.userId);
-}
-
-/**
- * グループチャットでのメッセージイベントを処理する
- * @param {object} event - LINEイベントオブジェクト
- */
-function handleGroupChat(event) {
-  const replyToken = event.replyToken;
-  const groupId = event.source.groupId;
-  const spreadsheetId = getSpreadsheetIdForGroup(groupId);
-
-  if (!spreadsheetId && !event.message.text.startsWith('@bot 登録')) {
-    const message = { type: 'text', text: MESSAGES.error.unregistered };
-    replyToLine(replyToken, [message]);
-    return;
-  }
-  
-  const replyMessage = createReplyMessage(event, spreadsheetId);
-  if (replyMessage) {
-    replyToLine(replyToken, replyMessage);
-  }
-}
-
-/**
- * 個人チャットでのメッセージイベントを処理する
- * @param {object} event - LINEイベントオブジェクト
- */
-function handlePersonalChat(event) {
+function handleMessage(event) {
   const replyToken = event.replyToken;
   const userId = event.source.userId;
   const userMessage = event.message.text;
 
-  // @botで始まるコマンドは、createReplyMessageに処理を任せる
+  // 1. 未登録ユーザーのコマンドをハンドリング
+  const spreadsheetId = getSpreadsheetIdByUserId(userId);
+  // ★ 修正: 未登録でも「使い方」と「ヘルプ」を許可する
+  const allowedCommandsForNewUser = ['@bot 登録', '@bot 使い方', '@bot ヘルプ'];
+  if (!spreadsheetId && !allowedCommandsForNewUser.some(cmd => userMessage.startsWith(cmd))) {
+    const message = { type: 'text', text: MESSAGES.error.unregistered };
+    replyToLine(replyToken, [message]);
+    return;
+  }
+
+  // 2. "@bot"で始まるコマンドはcreateReplyMessageに処理を任せる
   if (userMessage.startsWith('@bot')) {
-    const replyMessages = createReplyMessage(event, null); // 個人チャットではspreadsheetIdは不要
+    const replyMessages = createReplyMessage(event);
     if (replyMessages) {
       replyToLine(replyToken, replyMessages);
     }
     return;
   }
-  
+
+  // 3. 対話フローの処理
   const cache = CacheService.getUserCache();
   const cachedState = cache.get(userId);
 
-  // 1. 対話開始コマンド
+  // 3-1. 対話開始コマンド
   if (userMessage === '変更') {
     startModification(replyToken, userId);
     return;
   }
 
-  // 2. 対話中の処理
+  // 3-2. 対話中の処理
   if (cachedState) {
     continueModification(replyToken, userId, userMessage, cachedState);
     return;
   }
-  
-  // 3. 対話中でない場合のフォールバック
-  if (userMessage !== '変更') {
-    const message = { type: 'text', text: MESSAGES.error.timeout };
-    replyToLine(replyToken, [message]);
-  }
+
+  // 4. 上記のいずれにも当てはまらない場合
+  const message = { type: 'text', text: MESSAGES.error.defaultFallback };
+  replyToLine(replyToken, [message]);
 }
+
 
 /**
  * ユーザーメッセージを解析し、適切なコマンド処理を呼び出す司令塔
  * @param {object} event - LINEイベントオブジェクト
- * @param {string} spreadsheetId - 対象スプレッドシートのID
  * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
  */
-function createReplyMessage(event, spreadsheetId) {
+function createReplyMessage(event) {
   const userMessage = event.message.text;
   if (!userMessage.startsWith('@bot')) return null;
 
-  const rawCommand = userMessage.replace('@bot', '').trim();
-  const isDetailed = rawCommand.includes('詳細');
-  const command = rawCommand.replace('詳細', '').trim();
+  const userId = event.source.userId;
+  let spreadsheetId = null; 
+
+  const parts = userMessage.replace('@bot', '').trim().split(/\s+/);
+  const isDetailed = parts.includes('詳細');
+  const command = parts.filter(p => p !== '詳細').join(' ');
 
   let messageObject = null;
 
-  // コマンドに応じて担当の関数を呼び出す
-  if (command === '登録解除')        messageObject = handleUnregistration(event);
-  else if (command.startsWith('登録')) messageObject = handleRegistration(event);
-  else if (command === '変更')         messageObject = handleModificationGuide(event);
-  else if (command === '全部')         messageObject = createScheduleFlexMessage(isDetailed, spreadsheetId);
-  else if (command === '使い方' || command === 'ヘルプ') messageObject = getHelpFlexMessage();
-  else                                 messageObject = handleGarbageQuery(command, isDetailed, spreadsheetId);
+  if (command === '登録解除') {
+    messageObject = handleUnregistration(event);
+  } else if (command.startsWith('登録')) {
+    messageObject = handleRegistration(event);
+  } else if (command === '使い方' || command === 'ヘルプ') {
+    messageObject = getHelpFlexMessage();
+  } else if (command === '変更') {
+    messageObject = { type: 'text', text: MESSAGES.modification.guide };
+  } else {
+    spreadsheetId = getSpreadsheetIdByUserId(userId);
+    if (!spreadsheetId) {
+      return [{ type: 'text', text: MESSAGES.error.unregistered }];
+    }
+
+    if (command === '全部') {
+      messageObject = createScheduleFlexMessage(isDetailed, spreadsheetId);
+    } else {
+      messageObject = handleGarbageQuery(command, isDetailed, spreadsheetId);
+    }
+  }
   
   if (messageObject) {
     return [messageObject];
   }
-  
-  // どのコマンドにも当てはまらなかった場合
+
   return [{ type: 'text', text: MESSAGES.common.commandNotFound }];
 }
