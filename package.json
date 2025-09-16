@@ -1,4 +1,8 @@
 {
+  "name": "gomidashi-yoho",
+  "version": "1.0.0",
+  "description": "A LINE bot to remind you of the garbage disposal schedule.",
+  "private": true,
   "devDependencies": {
     "@types/google-apps-script": "^2.0.1"
   }
