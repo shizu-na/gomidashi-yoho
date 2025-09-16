@@ -1,10 +1,11 @@
+// messages.js
 /**
  * @fileoverview Botがユーザーに送信するすべてのメッセージテキストを管理します。
+ * [変更] 初回/再開フローの分岐に合わせてメッセージを再設計。
  */
 
 /**
  * Botがユーザーに送信するすべてのメッセージを管理するオブジェクト
- * 動的な部分は {0}, {1}... のプレースホルダーで定義
  * @const
  */
 const MESSAGES = {
@@ -12,48 +13,52 @@ const MESSAGES = {
   common: {
     cancel: '操作をキャンセルしました。',
     error: 'エラーが発生しました。時間をおいて再度お試しください。',
-    commandNotFound: 'すみません、コマンドが分かりませんでした。\n「使い方」でヘルプを表示します。',
-    headerProtection: 'ヘッダー行はBotが使用するため編集できません。',
   },
-  // イベント
+  // イベント（友だち追加時）
   event: {
-    follow: '友だち追加ありがとうございます！\n\nGoogleスプレッドシートを使って、あなたのゴミ出しスケジュールを管理します。\n\nまずは「使い方」と送信して、詳しい利用方法をご確認ください。',
+    // [変更] パターン1: 全くの新規ユーザー向け
+    follow_new: '友だち追加ありがとうございます！\n\nこのBotはあなたのゴミ出しスケジュールを管理します。\n\nまずは「登録」と送信して、利用を開始してください。',
+    // [追加] パターン2: 登録済みでアクティブなユーザー向け
+    follow_welcome_back: 'おかえりなさい！\n引き続きゴミ出し予報をご利用いただけます。',
+    // [追加] パターン3: 退会済みのユーザー向け
+    follow_rejoin_prompt: 'おかえりなさい！\n以前のスケジュールが保存されています。利用を再開しますか？',
   },
   // 登録
   registration: {
-    success: '✅ スプレッドシートの登録が完了しました！\nさっそく「今日」と送って、ゴミ出し日を確認してみましょう。',
-    updateSuccess: '✅ 登録されているスプレッドシートを更新しました。',
-    invalidUrl: '正しいスプレッドシートのURLを指定してください。\n例: 登録 https://docs.google.com/spreadsheets/d/xxxxx/edit',
-    error: 'エラーが発生しました。シートのURLが正しいか、Botが編集者として共有されているか確認してください。',
+    // [変更] 登録成功時のメッセージを変更
+    success: '✅ 登録が完了しました！\n\n次に「変更」と送信して、あなたのゴミ出しスケジュールを設定しましょう。',
+    // [追加] 未登録ユーザーに登録を促すメッセージ
+    prompt: 'ご利用には、まず「登録」と送信して利用を開始してください。',
   },
-  // 登録解除
+  // 退会・再開
   unregistration: {
-    success: '✅ 登録を解除しました。',
-    notFound: 'あなたはまだ登録されていないようです。',
+    success: '✅ 退会処理が完了しました。ご利用ありがとうございました。\nまた使いたくなったら、いつでも話しかけてくださいね。',
+    unsubscribed: '現在、通知や機能が停止されています。利用を再開しますか？',
+    reactivate: '✅ 利用を再開しました！',
   },
   // 変更（対話）
   modification: {
-    guide: 'ゴミの予定を変更するには、「変更」と送信してください。',
     start: 'どの曜日の予定を変更しますか？',
     askItem: '現在の【{0}】の品目は『{1}』です。\n新しいゴミの品目を入力してください。\n\n現在の設定のままにする場合は「スキップ」、入力をやめる場合は「キャンセル」と送信してください。',
     askNote: '現在の注意事項は『{0}』です。\n新しい注意事項を入力してください。\n\n現在のままにする場合は「スキップ」、注意事項を削除する場合は「なし」と入力してください。',
     success: '✅【{0}】の予定を更新しました。\n\n品目: {1}\n注意事項: {2}',
-    invalidDay: 'ボタンから曜日を選択するか、「キャンセル」と入力してください。',
+    invalidDay: '無効な曜日です。下のボタンからもう一度選択してください。',
+    itemTooLong: '⚠️ 品名は20文字以内で入力してください。', // [追加]
+    noteTooLong: '⚠️ 注意事項は100文字以内で入力してください。', // [追加]
   },
   // ゴミ出し日問い合わせ
   query: {
     todayResult: '今日のゴミは【{0}】です。',
+    tomorrowResult: '明日のゴミは【{0}】です。', // [追加]
     dayResult: '{0}のゴミは【{1}】です。',
     notes: '\n📝 注意事項：{0}',
-    notFound: '今日のゴミ出し情報は見つかりませんでした。',
-    sheetEmpty: 'ゴミ出し情報がシートに登録されていません。',
+    notFound: '{0}のゴミ出し情報は見つかりませんでした。', // [変更]
+    sheetEmpty: 'ゴミ出し情報が登録されていません。「変更」からスケジュールを登録してください。',
   },
   // エラー・状態
   error: {
-    unregistered: 'スプレッドシートがまだ登録されていません。\n「使い方」と送信して、登録方法をご確認ください。',
     timeout: '操作が中断されたか、時間切れになりました。\nもう一度「変更」と送信してやり直してください。',
     updateFailed: 'エラーにより予定の更新に失敗しました。',
-    defaultFallback: 'ご用件が分かりませんでした。\n下のボタンから操作を選ぶか、メッセージを送信してください。'
   },
   // Flex Message
   flex: {
@@ -62,17 +67,117 @@ const MESSAGES = {
   },
 };
 
+// =================================================================
+// メッセージ生成ヘルパー関数
+// =================================================================
+
 /**
- * メッセージのプレースホルダー（{0}, {1}など）を動的な値に置き換えるヘルパー関数
- * @param {string} text - プレースホルダーを含むメッセージ文字列
- * @param {...any} args - 置き換える値
- * @returns {string} フォーマット済みのメッセージ文字列
+ * メッセージのプレースホルダーを動的な値に置き換える
  */
 function formatMessage(text, ...args) {
-  let formattedText = text;
-  for (let i = 0; i < args.length; i++) {
-    const placeholder = new RegExp(`\\{${i}\\}`, 'g');
-    formattedText = formattedText.replace(placeholder, args[i]);
-  }
-  return formattedText;
+  return args.reduce((acc, val, i) => acc.replace(`{${i}}`, val), text);
+}
+
+/**
+ * [変更] フォールバックメッセージに「明日のごみ」ボタンを追加
+ * @returns {object}
+ */
+function getFallbackMessage() {
+  return {
+    'type': 'text',
+    'text': 'ご用件が分かりませんでした。\n下のボタンから操作を選ぶか、メッセージを送信してください。',
+    'quickReply': {
+      'items': [
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '今日のゴミ', 'text': '今日' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '明日のごみ', 'text': '明日' } }, // [追加]
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧表示', 'text': '全部' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '予定を変更', 'text': '変更' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '使い方', 'text': '使い方' } },
+      ]
+    }
+  };
+}
+
+/**
+ * [変更] 利用再開を促すメッセージを生成（テキストを引数で受け取れるように）
+ * @param {string} text - 表示するテキスト
+ * @returns {object}
+ */
+function getReactivationPromptMessage(text) {
+  return {
+    'type': 'text',
+    'text': text,
+    'quickReply': {
+      'items': [
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '利用を再開する', 'text': '利用を再開する' } }
+      ]
+    }
+  };
+}
+
+
+/**
+ * [対話] 変更する曜日を尋ねるメッセージを生成
+ */
+function getModificationDayPromptMessage() {
+  const quickReplyItems = WEEKDAYS_FULL.map(day => ({
+    type: 'action', action: { type: 'message', label: day, text: day }
+  }));
+  quickReplyItems.push({ type: 'action', action: { type: 'message', label: 'キャンセル', text: 'キャンセル' } });
+
+  return {
+    'type': 'text',
+    'text': MESSAGES.modification.start,
+    'quickReply': { 'items': quickReplyItems }
+  };
+}
+
+/**
+ * [対話] 品目を尋ねるメッセージを生成
+ */
+function getModificationItemPromptMessage(day, currentItem) {
+  return {
+    'type': 'text',
+    'text': formatMessage(MESSAGES.modification.askItem, day, currentItem),
+    'quickReply': {
+      'items': [
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'スキップ', 'text': 'スキップ' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'キャンセル', 'text': 'キャンセル' } }
+      ]
+    }
+  };
+}
+
+/**
+ * [対話] 注意事項を尋ねるメッセージを生成
+ */
+function getModificationNotePromptMessage(currentNote) {
+  return {
+    'type': 'text',
+    'text': formatMessage(MESSAGES.modification.askNote, currentNote),
+    'quickReply': {
+      'items': [
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'スキップ', 'text': 'スキップ' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '注意事項なし', 'text': 'なし' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'キャンセル', 'text': 'キャンセル' } }
+      ]
+    }
+  };
+}
+
+/**
+ * [追加] 登録を促すメッセージ（クイックリプライ付き）を生成
+ * @param {string} text - 表示するテキスト
+ * @returns {object}
+ */
+function getRegistrationPromptMessage(text) {
+  return {
+    'type': 'text',
+    'text': text,
+    'quickReply': {
+      'items': [
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '登録する', 'text': '登録' } }
+      ]
+    }
+  };
 }

@@ -1,171 +1,168 @@
+// spreadsheet.js
 /**
  * @fileoverview Googleスプレッドシートの操作に関連する関数群です。
- * マスターシートとユーザー個別シートの両方を扱います。
+ * [改修] 全面的に書き換え。単一のスプレッドシート内の「Users」「Schedules」シートを操作する形に変更。
  */
 
 // =================================================================
-// マスターシート関連
+// データベース操作コア
 // =================================================================
 
 /**
- * マスター管理シートのオブジェクトを取得する（内部利用向け）
+ * データベースのスプレッドシートオブジェクトを取得する
  * @private
- * @returns {GoogleAppsScript.Spreadsheet.Sheet|null}
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet|null}
  */
-function getMasterSheet_() {
-  const MASTER_ID = PropertiesService.getScriptProperties().getProperty('MASTER_ID');
-  if (!MASTER_ID) {
-    console.error('GASのスクリプトプロパティに「MASTER_ID」が設定されていません。');
+function getDatabase_() {
+  const DATABASE_SHEET_ID = PropertiesService.getScriptProperties().getProperty('DATABASE_SHEET_ID');
+  if (!DATABASE_SHEET_ID) {
+    console.error('GASのスクリプトプロパティに「DATABASE_SHEET_ID」が設定されていません。');
     return null;
   }
   try {
-    return SpreadsheetApp.openById(MASTER_ID).getSheets()[0];
+    return SpreadsheetApp.openById(DATABASE_SHEET_ID);
   } catch (e) {
-    console.error(`マスターシート（ID: ${MASTER_ID}）が開けませんでした。`);
+    console.error(`データベース（ID: ${DATABASE_SHEET_ID}）が開けませんでした。`);
     return null;
   }
 }
 
+// =================================================================
+// Usersシート関連
+// =================================================================
+
 /**
- * マスターシートから指定されたuserIdの行情報を検索する（内部利用向け）
- * @private
+ * Usersシートから指定されたuserIdのレコードを検索する
  * @param {string} userId - 検索するユーザーID
- * @param {GoogleAppsScript.Spreadsheet.Sheet} masterSheet - マスターシートオブジェクト
- * @returns {{row: number, data: string[]}|null} 見つかった行番号とデータ（[userId, spreadsheetId]）、なければnull
+ * @returns {{row: number, status: string}|null} 見つかった行番号とステータス、なければnull
  */
-function findUserRowInMasterSheet_(userId, masterSheet) {
-  // パフォーマンス向上のため、必要なA:B列のみを一度に取得
-  const data = masterSheet.getRange('A:B').getValues(); 
-  for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === userId) {
-      return {
-        row: i + 1, // GASの行番号は1から始まるため +1 する
-        data: data[i] 
-      };
-    }
-  }
-  return null;
-}
-
-/**
- * userIdを基に、マスターシートから対応するスプレッドシートIDを検索して返す
- * @param {string} userId - 検索対象のユーザーID
- * @returns {string|null} - 見つかった場合はスプレッドシートID、見つからない場合はnull
- */
-function getSpreadsheetIdByUserId(userId) {
+function getUserRecord(userId) {
   try {
-    const masterSheet = getMasterSheet_();
-    if (!masterSheet) return null;
-    
-    const result = findUserRowInMasterSheet_(userId, masterSheet);
-    // resultオブジェクトが存在すれば、そのdata配列の2番目（インデックス1）のspreadsheetIdを返す
-    return result ? result.data[1] : null;
+    const db = getDatabase_();
+    if (!db) return null;
+    const sheet = db.getSheetByName('Users');
+    if (!sheet) return null;
 
+    const data = sheet.getRange(2, COLUMNS_USER.USER_ID + 1, sheet.getLastRow() - 1, 2).getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (data[i][0] === userId) {
+        return {
+          row: i + 2, // GASの行番号は1から、ヘッダー分を考慮
+          status: data[i][1]
+        };
+      }
+    }
+    return null;
   } catch (e) {
-    writeLog('ERROR', `個人シート検索でエラー: ${e.message}`, userId);
+    writeLog('ERROR', `ユーザーレコード検索でエラー: ${e.message}`, userId);
     return null;
   }
 }
 
+/**
+ * 新規ユーザーをUsersシートとSchedulesシートに作成する
+ * @param {string} userId - 作成するユーザーID
+ */
+function createNewUser(userId) {
+  try {
+    const db = getDatabase_();
+    if (!db) return;
+    const usersSheet = db.getSheetByName('Users');
+    const schedulesSheet = db.getSheetByName('Schedules');
+    const now = new Date();
+
+    // Usersシートに行を追加
+    usersSheet.appendRow([userId, USER_STATUS.ACTIVE, now, now]);
+
+    // Schedulesシートに7日分の初期データを追加
+    const initialSchedules = WEEKDAYS_FULL.map(day => {
+      if (day === '日曜日') {
+        return [userId, day, '（回収なし）', '-'];
+      }
+      return [userId, day, '（未設定）', '-'];
+    });
+    schedulesSheet.getRange(schedulesSheet.getLastRow() + 1, 1, 7, 4).setValues(initialSchedules);
+
+  } catch (e) {
+    writeLog('ERROR', `新規ユーザー作成でエラー: ${e.message}`, userId);
+  }
+}
+
+/**
+ * ユーザーのステータスを更新する
+ * @param {string} userId - 更新対象のユーザーID
+ * @param {string} status - 新しいステータス
+ */
+function updateUserStatus(userId, status) {
+  try {
+    const userRecord = getUserRecord(userId);
+    if (!userRecord) return;
+
+    const db = getDatabase_();
+    if (!db) return;
+    const sheet = db.getSheetByName('Users');
+    sheet.getRange(userRecord.row, COLUMNS_USER.STATUS + 1).setValue(status);
+    sheet.getRange(userRecord.row, COLUMNS_USER.UPDATED_AT + 1).setValue(new Date());
+    writeLog('INFO', `ユーザーステータス更新: ${status}`, userId);
+  } catch (e) {
+    writeLog('ERROR', `ユーザーステータス更新でエラー: ${e.message}`, userId);
+  }
+}
+
 // =================================================================
-// ユーザー個別シート関連
+// Schedulesシート関連
 // =================================================================
 
 /**
- * 指定されたスプレッドシートからゴミ出しデータを取得して返す
- * @param {string} spreadsheetId - データを取得するスプレッドシートのID
+ * 指定されたユーザーIDのゴミ出しスケジュールを全件取得する
+ * @param {string} userId - データを取得するユーザーのID
  * @returns {Array<Array<string>>} ゴミ出しスケジュールのデータ配列
  */
-function getGarbageData(spreadsheetId) {
-  if (!spreadsheetId) return [];
+function getSchedulesByUserId(userId) {
   try {
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheets()[0];
-    const lastRow = sheet.getLastRow();
-    // ヘッダー（1行目）しかない場合はデータがないので空配列を返す
-    if (lastRow < 2) return []; 
-    
-    // getRange(開始行, 開始列, 取得する行数, 取得する列数)
-    return sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+    const db = getDatabase_();
+    if (!db) return [];
+    const sheet = db.getSheetByName('Schedules');
+    if (!sheet || sheet.getLastRow() < 2) return [];
+
+    const allData = sheet.getDataRange().getValues();
+    // ヘッダー行を除き、userIdでフィルタリング
+    return allData.slice(1).filter(row => row[COLUMNS_SCHEDULE.USER_ID] === userId);
   } catch (e) {
-    // ユーザーがシートを削除したり、Botのアクセス権を外した場合にエラーが発生する可能性がある
-    writeLog('ERROR', `ゴミ出しデータの取得に失敗 (ID: ${spreadsheetId}): ${e.message}`);
+    writeLog('ERROR', `スケジュール取得でエラー: ${e.message}`, userId);
     return [];
   }
 }
 
 /**
- * 個人のゴミ出し情報を更新する
+ * 指定ユーザーの特定曜日のスケジュールを更新する
  * @param {string} userId - 更新対象のユーザーID
- * @param {string} day - 更新対象の曜日 (例: '月曜')
+ * @param {string} day - 更新対象の曜日 (例: '月曜日')
  * @param {string} item - 新しい品目
  * @param {string} note - 新しい注意事項
  * @returns {boolean} 成功すればtrue、失敗すればfalse
  */
-function updateGarbageSchedule(userId, day, item, note) {
+function updateSchedule(userId, day, item, note) {
   try {
-    const spreadsheetId = getSpreadsheetIdByUserId(userId);
-    if (!spreadsheetId) return false;
+    const db = getDatabase_();
+    if (!db) return false;
+    const sheet = db.getSheetByName('Schedules');
+    const allData = sheet.getDataRange().getValues();
 
-    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheets()[0];
-    const data = sheet.getDataRange().getValues();
-    const targetDay = day.endsWith('曜') ? `${day}日` : `${day}曜日`;
-
-    for (let i = 1; i < data.length; i++) { // i=0はヘッダーなのでスキップ
-      if (data[i][COLUMN.DAY_OF_WEEK] === targetDay) {
+    // userIdと曜日が一致する行を探す
+    for (let i = 1; i < allData.length; i++) { // i=0はヘッダー
+      if (allData[i][COLUMNS_SCHEDULE.USER_ID] === userId && allData[i][COLUMNS_SCHEDULE.DAY_OF_WEEK] === day) {
         const rowNum = i + 1;
-        // パフォーマンス向上のため、複数列をsetValuesで一度に更新
-        sheet.getRange(rowNum, COLUMN.GARBAGE_TYPE + 1, 1, 2).setValues([[item, note]]);
+        // 品目と注意事項を一度に更新
+        sheet.getRange(rowNum, COLUMNS_SCHEDULE.GARBAGE_TYPE + 1, 1, 2).setValues([[item, note]]);
         return true;
       }
     }
-    
-    // ループで見つからなかった場合、該当日がシートに存在しないので新しい行として追加
-    sheet.appendRow([targetDay, item, note]);
-    return true;
-
+    return false; // 該当データが見つからなかった
   } catch (e) {
     writeLog('ERROR', `スケジュール更新処理でエラー: ${e.message}`, userId);
     return false;
   }
-}
-
-// =================================================================
-// シートの初期化・設定関連
-// =================================================================
-
-/**
- * ユーザーのシートにテンプレート（ヘッダーと曜日データ）を書き込む
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - 対象のSheetオブジェクト
- */
-function initializeSheetTemplate(sheet) {
-  // シートが空（行が0）の場合のみ初期化を実行
-  if (sheet.getLastRow() === 0) { 
-    const headers = ['曜日', 'ゴミの種類', '注意事項'];
-    const templateData = [
-      ['月曜日', '（例：燃えるゴミ）', '（例：生ゴミは水を切る）'],
-      ['火曜日', '（未設定）', '-'],
-      ['水曜日', '（未設定）', '-'],
-      ['木曜日', '（未設定）', '-'],
-      ['金曜日', '（未設定）', '-'],
-      ['土曜日', '（未設定）', '-'],
-      ['日曜日', '（回収なし）', '-'],
-    ];
-    
-    sheet.appendRow(headers);
-    sheet.getRange(2, 1, templateData.length, templateData[0].length).setValues(templateData);
-    sheet.autoResizeColumns(1, headers.length); // 列幅を自動調整
-  }
-}
-
-/**
- * シートのヘッダー行（1行目）を編集できないように保護する
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - 対象のSheetオブジェクト
- */
-function protectHeaderRow(sheet) {
-  const protection = sheet.getRange('1:1').protect();
-  protection.setDescription(MESSAGES.common.headerProtection);
-  // 編集しようとすると警告が表示されるが、編集自体は可能
-  protection.setWarningOnly(true);
 }
 
 
@@ -188,17 +185,15 @@ function writeLog(level, message, ownerId = '') {
     }
     const spreadsheet = SpreadsheetApp.openById(LOG_ID);
     const now = new Date();
-    // `Log_2023-10`のような形式で月ごとにシートを分ける
     const sheetName = `Log_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     let sheet = spreadsheet.getSheetByName(sheetName);
-    
+
     if (!sheet) {
       sheet = spreadsheet.insertSheet(sheetName, 0);
       sheet.appendRow(['タイムスタンプ', 'ログレベル', 'メッセージ', 'Owner ID']);
     }
     sheet.appendRow([now, level, message, ownerId]);
   } catch (e) {
-    // ログ書き込み自体のエラーはコンソールに出力するのみ
     console.error(`ログの書き込みに失敗しました: ${e.message}`);
   }
 }

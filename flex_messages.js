@@ -1,5 +1,7 @@
+// flex_messages.js
 /**
  * @fileoverview LINE Flex MessageのJSONオブジェクトを生成するための関数群です。
+ * [改修] スケジュール取得をuserIdベースに変更。
  */
 
 /**
@@ -10,35 +12,32 @@ function getHelpFlexMessage() {
   return {
     "type": "flex",
     "altText": MESSAGES.flex.helpAltText,
-    "contents": helpMessageContents // この変数はこのファイルの下部で定義されています
+    "contents": helpMessageContents
   };
 }
 
 /**
  * 全曜日のスケジュール一覧Flex Messageを動的に生成する
  * @param {boolean} isDetailed - 詳細（注意事項）を含めるかどうか
- * @param {string} spreadsheetId - 対象スプレッドシートのID
+ * @param {string} userId - 対象ユーザーのID
  * @returns {object} LINE送信用Flex Messageオブジェクト
  */
-function createScheduleFlexMessage(isDetailed, spreadsheetId) {
-  const data = getGarbageData(spreadsheetId);
+function createScheduleFlexMessage(isDetailed, userId) {
+  const data = getSchedulesByUserId(userId);
   if (data.length === 0) {
     return { type: 'text', text: MESSAGES.query.sheetEmpty };
   }
 
-  const weekdaysOrder = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
-  // スプレッドシートの曜日順にソートする
-  data.sort((a, b) => 
-    weekdaysOrder.indexOf(a[COLUMN.DAY_OF_WEEK]) - weekdaysOrder.indexOf(b[COLUMN.DAY_OF_WEEK])
+  const sortedData = data.sort((a, b) =>
+    WEEKDAYS_FULL.indexOf(a[COLUMNS_SCHEDULE.DAY_OF_WEEK]) - WEEKDAYS_FULL.indexOf(b[COLUMNS_SCHEDULE.DAY_OF_WEEK])
   );
 
-  const bubbles = data.map(row => {
-    const day = row[COLUMN.DAY_OF_WEEK];
-    const item = row[COLUMN.GARBAGE_TYPE] || '（未設定）';
-    const note = row[COLUMN.NOTES] || '';
+  const bubbles = sortedData.map(row => {
+    const day = row[COLUMNS_SCHEDULE.DAY_OF_WEEK];
+    const item = row[COLUMNS_SCHEDULE.GARBAGE_TYPE] || '（未設定）';
+    const note = row[COLUMNS_SCHEDULE.NOTES] || '';
 
     const bodyContents = [{ "type": "text", "text": item, "wrap": true, "weight": "bold", "size": "md" }];
-    // 詳細表示が有効で、注意事項が「-」ではない場合に内容を追加
     if (isDetailed && note && note !== '-') {
       bodyContents.push({ "type": "separator", "margin": "lg" });
       bodyContents.push({ "type": "text", "text": note, "wrap": true, "size": "sm", "color": "#666666" });
@@ -75,256 +74,255 @@ function createScheduleFlexMessage(isDetailed, spreadsheetId) {
 
 /**
  * 使い方ガイドのFlex Messageコンテンツ
- * ※元のコードで省略されていた `helpMessageContents` の内容をここにペーストしてください。
  * @const {object}
  */
 const helpMessageContents = {
-    "type": "carousel",
-    "contents": [
-        {
-            "type": "bubble",
-            "size": "deca",
-            "header": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "設定・管理",
-                        "color": "#FFFFFF",
-                        "weight": "bold",
-                        "align": "center",
-                        "size": "lg"
-                    }
-                ],
-                "backgroundColor": "#6C757D",
-                "paddingAll": "10px"
-            },
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "● 利用開始（シート登録）",
-                        "weight": "bold",
-                        "size": "md",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「@bot 登録 <URL>」\nURLはスプレッドシートのもの",
-                        "align": "center",
-                        "wrap": true,
-                        "margin": "md",
-                        "size": "sm"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "xl"
-                    },
-                    {
-                        "type": "text",
-                        "text": "● 登録の解除",
-                        "weight": "bold",
-                        "margin": "lg",
-                        "size": "md",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「@bot 登録解除」",
-                        "align": "center",
-                        "wrap": true,
-                        "margin": "md"
-                    }
-                ],
-                "paddingAll": "15px",
-                "spacing": "sm"
-            }
-        },
-        {
-            "type": "bubble",
-            "size": "deca",
-            "header": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "予定の確認",
-                        "color": "#FFFFFF",
-                        "weight": "bold",
-                        "align": "center",
-                        "size": "lg"
-                    }
-                ],
-                "backgroundColor": "#176FB8",
-                "paddingAll": "10px"
-            },
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "● 今日のゴミを確認",
-                        "weight": "bold",
-                        "size": "md",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「@bot 今日」\n「@bot 今日 詳細」",
-                        "align": "center",
-                        "wrap": true,
-                        "margin": "md"
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "xl"
-                    },
-                    {
-                        "type": "text",
-                        "text": "● 特定の曜日を確認",
-                        "weight": "bold",
-                        "margin": "lg",
-                        "size": "md",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「@bot 月曜」\n「@bot 火曜 詳細」",
-                        "align": "center",
-                        "wrap": true,
-                        "margin": "md"
-                    }
-                ],
-                "paddingAll": "15px",
-                "spacing": "sm"
-            }
-        },
-        {
-            "type": "bubble",
-            "size": "deca",
-            "header": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "予定の一覧表示",
-                        "color": "#FFFFFF",
-                        "weight": "bold",
-                        "align": "center",
-                        "size": "lg"
-                    }
-                ],
-                "backgroundColor": "#5A9E46",
-                "paddingAll": "10px"
-            },
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "● 全ての予定を確認",
-                        "weight": "bold",
-                        "size": "md",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「@bot 全部」",
-                        "align": "center",
-                        "margin": "md",
-                        "wrap": true
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "lg"
-                    },
-                    {
-                        "type": "text",
-                        "text": "● 全ての詳細を確認",
-                        "weight": "bold",
-                        "margin": "lg",
-                        "size": "md",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「@bot 全部 詳細」",
-                        "align": "center",
-                        "margin": "md",
-                        "wrap": true
-                    }
-                ],
-                "paddingAll": "15px",
-                "spacing": "sm"
-            }
-        },
-        {
-            "type": "bubble",
-            "size": "deca",
-            "header": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "予定の変更",
-                        "size": "lg",
-                        "color": "#FFFFFF",
-                        "weight": "bold",
-                        "align": "center"
-                    }
-                ],
-                "backgroundColor": "#DC3545",
-                "paddingAll": "10px"
-            },
-            "body": {
-                "type": "box",
-                "layout": "vertical",
-                "contents": [
-                    {
-                        "type": "text",
-                        "text": "● 対話形式で変更",
-                        "size": "md",
-                        "weight": "bold",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「変更」と送信\n（@bot は不要です）",
-                        "margin": "md",
-                        "align": "center",
-                        "wrap": true
-                    },
-                    {
-                        "type": "separator",
-                        "margin": "xl"
-                    },
-                    {
-                        "type": "text",
-                        "text": "● その他",
-                        "size": "md",
-                        "weight": "bold",
-                        "margin": "lg",
-                        "wrap": true
-                    },
-                    {
-                        "type": "text",
-                        "text": "「@bot 使い方」で\nこのガイドを再度表示",
-                        "align": "center",
-                        "margin": "md",
-                        "wrap": true
-                    }
-                ],
-                "spacing": "sm",
-                "paddingAll": "15px"
-            }
-        }
-    ]
+  "type": "carousel",
+  "contents": [
+    {
+      "type": "bubble",
+      "size": "deca",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "基本操作",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center",
+            "size": "lg"
+          }
+        ],
+        "backgroundColor": "#6C757D",
+        "paddingAll": "10px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "● 利用開始",
+            "weight": "bold",
+            "size": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "このBotに話しかけると自動で利用が開始されます。",
+            "align": "center",
+            "wrap": true,
+            "margin": "md",
+            "size": "sm"
+          },
+          {
+            "type": "separator",
+            "margin": "xl"
+          },
+          {
+            "type": "text",
+            "text": "● 利用の停止（退会）",
+            "weight": "bold",
+            "margin": "lg",
+            "size": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "「退会」",
+            "align": "center",
+            "wrap": true,
+            "margin": "md"
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "sm"
+      }
+    },
+    {
+      "type": "bubble",
+      "size": "deca",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "予定の確認",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center",
+            "size": "lg"
+          }
+        ],
+        "backgroundColor": "#176FB8",
+        "paddingAll": "10px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "● 今日のゴミを確認",
+            "weight": "bold",
+            "size": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "「今日」「今日 詳細」",
+            "align": "center",
+            "wrap": true,
+            "margin": "md"
+          },
+          {
+            "type": "separator",
+            "margin": "xl"
+          },
+          {
+            "type": "text",
+            "text": "● 特定の曜日を確認",
+            "weight": "bold",
+            "margin": "lg",
+            "size": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "「月曜」「火曜 詳細」",
+            "align": "center",
+            "wrap": true,
+            "margin": "md"
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "sm"
+      }
+    },
+    {
+      "type": "bubble",
+      "size": "deca",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "予定の一覧表示",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center",
+            "size": "lg"
+          }
+        ],
+        "backgroundColor": "#5A9E46",
+        "paddingAll": "10px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "● 全ての予定を確認",
+            "weight": "bold",
+            "size": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "「全部」",
+            "align": "center",
+            "margin": "md",
+            "wrap": true
+          },
+          {
+            "type": "separator",
+            "margin": "lg"
+          },
+          {
+            "type": "text",
+            "text": "● 全ての詳細を確認",
+            "weight": "bold",
+            "margin": "lg",
+            "size": "md",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "「全部 詳細」",
+            "align": "center",
+            "margin": "md",
+            "wrap": true
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "sm"
+      }
+    },
+    {
+      "type": "bubble",
+      "size": "deca",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "予定の変更",
+            "size": "lg",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center"
+          }
+        ],
+        "backgroundColor": "#DC3545",
+        "paddingAll": "10px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "● 対話形式で変更",
+            "size": "md",
+            "weight": "bold",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "「変更」と送信",
+            "margin": "md",
+            "align": "center",
+            "wrap": true
+          },
+          {
+            "type": "separator",
+            "margin": "xl"
+          },
+          {
+            "type": "text",
+            "text": "● その他",
+            "size": "md",
+            "weight": "bold",
+            "margin": "lg",
+            "wrap": true
+          },
+          {
+            "type": "text",
+            "text": "「使い方」で\nこのガイドを再度表示",
+            "align": "center",
+            "margin": "md",
+            "wrap": true
+          }
+        ],
+        "spacing": "sm",
+        "paddingAll": "15px"
+      }
+    }
+  ]
 };
