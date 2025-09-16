@@ -21,7 +21,7 @@ function handleUnregistration(userId) {
 }
 
 /**
- * [変更] ゴミ出し日の問い合わせに「明日」を追加
+ * ゴミ出し日の問い合わせを処理する
  * @param {string} command - ユーザーが入力したコマンド
  * @param {boolean} isDetailed - 詳細表示フラグ
  * @param {string} userId - 対象ユーザーのID
@@ -34,41 +34,31 @@ function handleGarbageQuery(command, isDetailed, userId) {
   }
 
   let targetDay;
-  const normalizedCommand = command.replace(/曜|曜日/, '');
-
+  
   if (command === '今日' || command === 'きょう') {
-    const todayIndex = new Date().getDay(); // 0:日曜, 1:月曜...
+    const todayIndex = (new Date().getDay() + 6) % 7; // 月曜=0, ..., 日曜=6 に変換
     targetDay = WEEKDAYS_FULL[todayIndex];
-  } else if (command === '明日' || command === 'あした') { // [追加] 「明日」コマンドの処理
+  } else if (command === '明日' || command === 'あした') {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowIndex = tomorrow.getDay();
+    const tomorrowIndex = (tomorrow.getDay() + 6) % 7;
     targetDay = WEEKDAYS_FULL[tomorrowIndex];
-  } else if (WEEKDAYS.includes(normalizedCommand)) {
-    targetDay = `${normalizedCommand}曜日`;
   }
 
-  if (!targetDay) return null;
+  if (!targetDay) return null; // "今日" "明日" 以外はここでnullになり、フォールバックメッセージが返る
 
   const foundRow = data.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
 
   if (!foundRow) {
-    // [変更] 「明日」の場合のメッセージを追加
-    if (command === '今日' || command === 'きょう' || command === '明日' || command === 'あした') {
-      return { type: 'text', text: formatMessage(MESSAGES.query.notFound, command) };
-    }
-    return null;
+    return { type: 'text', text: formatMessage(MESSAGES.query.notFound, command) };
   }
 
   let replyText;
   const garbageType = foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE];
   if (command === '今日' || command === 'きょう') {
     replyText = formatMessage(MESSAGES.query.todayResult, garbageType);
-  } else if (command === '明日' || command === 'あした') { // [追加] 「明日」用の返信メッセージ
+  } else if (command === '明日' || command === 'あした') {
     replyText = formatMessage(MESSAGES.query.tomorrowResult, garbageType);
-  }
-  else {
-    replyText = formatMessage(MESSAGES.query.dayResult, foundRow[COLUMNS_SCHEDULE.DAY_OF_WEEK], garbageType);
   }
 
   if (isDetailed) {
@@ -79,19 +69,32 @@ function handleGarbageQuery(command, isDetailed, userId) {
   return { type: 'text', text: replyText };
 }
 
+
 /**
- * スケジュール変更（対話）の開始処理
+ * ★ 新規: ポストバックを起点とするスケジュール変更フローを開始する
  * @param {string} replyToken 
  * @param {string} userId 
+ * @param {string} dayToModify - 変更対象の曜日 (例: '月曜日')
  */
-function startModification(replyToken, userId) {
+function startModificationFlow(replyToken, userId, dayToModify) {
+  const schedules = getSchedulesByUserId(userId);
+  const foundRow = schedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === dayToModify);
+
+  const currentItem = foundRow ? foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE] : '（未設定）';
+  const currentNote = foundRow ? foundRow[COLUMNS_SCHEDULE.NOTES] : '（未設定）';
+
+  // ユーザーの状態をキャッシュに保存
   const state = {
-    step: MODIFICATION_FLOW.STEPS.WAITING_FOR_DAY,
+    step: MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM, // ★ 変更: 最初のステップが品目入力待ちになる
+    day: dayToModify,
+    currentItem: currentItem,
+    currentNote: currentNote,
   };
   const cache = CacheService.getUserCache();
   cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
 
-  replyToLine(replyToken, [getModificationDayPromptMessage()]);
+  // 品目を尋ねるメッセージを送信
+  replyToLine(replyToken, [getModificationItemPromptMessage(dayToModify, currentItem)]);
 }
 
 /**
@@ -112,9 +115,7 @@ function continueModification(replyToken, userId, userMessage, cachedState) {
   }
 
   switch (state.step) {
-    case MODIFICATION_FLOW.STEPS.WAITING_FOR_DAY:
-      handleDaySelection_(replyToken, userId, userMessage, state, cache);
-      break;
+    // ★ 削除: WAITING_FOR_DAY の case を削除
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM:
       handleItemInput_(replyToken, userId, userMessage, state, cache);
       break;
@@ -128,67 +129,37 @@ function continueModification(replyToken, userId, userMessage, cachedState) {
   }
 }
 
-// --- 対話フローの内部処理（プライベート関数） ---
-
 /**
- * [対話] 曜日選択の処理
- * @private
- */
-function handleDaySelection_(replyToken, userId, selectedDay, state, cache) {
-  const validDays = WEEKDAYS_FULL;
-  if (!validDays.includes(selectedDay)) {
-    const errorMessage = getModificationDayPromptMessage(); // ボタン付きメッセージを生成
-    errorMessage.text = MESSAGES.modification.invalidDay;      // テキスト部分をエラーメッセージに差し替え
-    replyToLine(replyToken, [errorMessage]);                 // ボタン付きで返信する
-    return;
-  }
-
-  const schedules = getSchedulesByUserId(userId);
-  const foundRow = schedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === selectedDay);
-
-  const currentItem = foundRow ? foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE] : '（未設定）';
-  const currentNote = foundRow ? foundRow[COLUMNS_SCHEDULE.NOTES] : '（未設定）';
-
-  state.step = MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM;
-  state.day = selectedDay;
-  state.currentItem = currentItem;
-  state.currentNote = currentNote;
-  cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
-
-  replyToLine(replyToken, [getModificationItemPromptMessage(selectedDay, currentItem)]);
-}
-
-/**
- * [対話] 品目入力の処理に文字数チェックを追加
+ * [対話] 品目入力の処理
  * @private
  */
 function handleItemInput_(replyToken, userId, newItem, state, cache) {
-  // [追加] 文字数チェック (20文字)
   if (newItem !== 'スキップ' && newItem.length > VALIDATION_LIMITS.ITEM_MAX_LENGTH) {
     const errorMessage = getModificationItemPromptMessage(state.day, state.currentItem);
-    errorMessage.text = MESSAGES.modification.itemTooLong; // エラーメッセージに差し替え
+    errorMessage.text = MESSAGES.modification.itemTooLong;
     replyToLine(replyToken, [errorMessage]);
-    return; // 文字数オーバーなので処理を中断し、再入力を促す
+    return;
   }
 
   state.step = MODIFICATION_FLOW.STEPS.WAITING_FOR_NOTE;
-  if (newItem !== 'スキップ') state.newItem = newItem;
+  if (newItem !== 'スキップ') {
+    state.newItem = newItem;
+  }
   cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
 
   replyToLine(replyToken, [getModificationNotePromptMessage(state.currentNote)]);
 }
 
 /**
- * [対話] 注意事項入力の処理に文字数チェックを追加
+ * [対話] 注意事項入力の処理
  * @private
  */
 function handleNoteInput_(replyToken, userId, newNote, state, cache) {
-  // [追加] 文字数チェック (100文字)
   if (newNote !== 'スキップ' && newNote !== 'なし' && newNote.length > VALIDATION_LIMITS.NOTE_MAX_LENGTH) {
     const errorMessage = getModificationNotePromptMessage(state.currentNote);
-    errorMessage.text = MESSAGES.modification.noteTooLong; // エラーメッセージに差し替え
+    errorMessage.text = MESSAGES.modification.noteTooLong;
     replyToLine(replyToken, [errorMessage]);
-    return; // 文字数オーバーなので処理を中断し、再入力を促す
+    return;
   }
 
   const finalItem = state.newItem || state.currentItem;

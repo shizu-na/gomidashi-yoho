@@ -31,6 +31,9 @@ function doPost(e) {
     case 'follow':
       handleFollowEvent(event);
       break;
+    case 'postback':
+      handlePostback(event);
+      break;
   }
 }
 
@@ -54,6 +57,49 @@ function handleFollowEvent(event) {
   } else {
     // パターン3: 登録済みでアクティブなユーザー
     replyToLine(replyToken, [{ type: 'text', text: MESSAGES.event.follow_welcome_back }]);
+  }
+}
+
+/**
+ * ★ 追加: ポストバックデータを解析するためのヘルパー関数
+ * @param {string} query - "key=value&key2=value2" 形式の文字列
+ * @returns {object} 解析後のオブジェクト { key: value, key2: value2 }
+ */
+function parseQueryString_(query) {
+  const params = {};
+  if (!query) {
+    return params;
+  }
+  query.split('&').forEach(pair => {
+    const parts = pair.split('=');
+    if (parts.length === 2) {
+      // decodeURIComponentは念のためですが、安全のために入れておきます
+      const key = decodeURIComponent(parts[0]);
+      const value = decodeURIComponent(parts[1]);
+      params[key] = value;
+    }
+  });
+  return params;
+}
+
+/**
+ * ★ 修正: ポストバックイベントを専門に処理する関数
+ * URLSearchParamsを使わない方法でデータを解析します。
+ * @param {object} event - LINEイベントオブジェクト
+ */
+function handlePostback(event) {
+  const replyToken = event.replyToken;
+  const userId = event.source.userId;
+  const postbackData = event.postback.data;
+
+  // ★ 変更: 新しいヘルパー関数でポストバックデータを解析
+  const params = parseQueryString_(postbackData);
+  const action = params['action']; // オブジェクトのキーとして値を取得
+
+  // actionが 'startChange' の場合、スケジュール変更フローを開始
+  if (action === 'startChange') {
+    const day = params['day'];
+    startModificationFlow(replyToken, userId, day);
   }
 }
 
@@ -84,7 +130,7 @@ function handleMessage(event) {
 
   // 3. 未登録ユーザーのハンドリング
   if (!userRecord) {
-    if (userMessage === '登録') {
+    if (userMessage === 'はじめる') {
       createNewUser(userId);
       writeLog('INFO', '新規ユーザー登録', userId);
       replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.success }]);
@@ -119,7 +165,7 @@ function handleMessage(event) {
 
 
 /**
- * ユーザーメッセージを解析し、適切なコマンド処理を呼び出す（変更なし）
+ * ユーザーメッセージを解析し、適切なコマンド処理を呼び出す
  * @param {object} event - LINEイベントオブジェクト
  * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
  */
@@ -133,9 +179,6 @@ function createReplyMessage(event) {
   let messageObject = null;
 
   switch (command) {
-    case '変更':
-      startModification(event.replyToken, userId);
-      return null;
     case '退会':
       messageObject = handleUnregistration(userId);
       break;

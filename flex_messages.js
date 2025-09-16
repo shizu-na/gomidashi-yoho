@@ -58,6 +58,11 @@ function createScheduleFlexMessage(isDetailed, userId) {
         "layout": "vertical",
         "spacing": "md",
         "contents": bodyContents
+      },
+      "action": {
+        "type": "postback", // アクションタイプ
+        "label": "変更",    // タップ領域のラベル（視覚的には影響なし）
+        "data": `action=startChange&day=${day}` // Botに送信される隠しデータ
       }
     };
   });

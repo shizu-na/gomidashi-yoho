@@ -1,7 +1,6 @@
-// constants.js
 /**
  * @fileoverview スクリプト全体で使用する定数を管理します。
- * [改修] 新しいシート構成に合わせて列インデックスを更新。
+ * [改修] 新しい変更フローに合わせて対話の状態を修正。
  */
 
 // Usersシートの列インデックス
@@ -26,11 +25,10 @@ const USER_STATUS = {
   UNSUBSCRIBED: 'unsubscribed',
 };
 
-// 対話フローの状態
+// ★ 変更: 対話フローの状態をシンプル化
 const MODIFICATION_FLOW = {
   CACHE_EXPIRATION_SECONDS: 300, // 5分
   STEPS: {
-    WAITING_FOR_DAY: 'waiting_for_day',
     WAITING_FOR_ITEM: 'waiting_for_item',
     WAITING_FOR_NOTE: 'waiting_for_note',
   },
@@ -40,6 +38,7 @@ const MODIFICATION_FLOW = {
 const WEEKDAYS = ['月', '火', '水', '木', '金', '土', '日'];
 const WEEKDAYS_FULL = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
 
+// バリデーションの文字数制限
 const VALIDATION_LIMITS = {
   ITEM_MAX_LENGTH: 20,
   NOTE_MAX_LENGTH: 100,
