@@ -36,7 +36,8 @@ function handleUnregistration(event) {
  */
 function handleRegistration(event) {
   const userId = event.source.userId;
-  const sheetUrl = event.message.text.replace('@bot', '').replace('登録', '').trim();
+  // 「@bot」が不要になったため、置換ロジックをシンプルに
+  const sheetUrl = event.message.text.replace('登録', '').trim();
 
   const match = sheetUrl.match(/\/d\/(.+?)\//);
   if (!match) {
@@ -52,19 +53,16 @@ function handleRegistration(event) {
     let successMessage;
 
     if (result) {
-      // ユーザー情報（シートID）を更新
-      masterSheet.getRange(result.row, 2).setValue(newSheetId); // B列: spreadsheetId
-      masterSheet.getRange(result.row, 3).setValue(new Date()); // C列: timestamp
+      masterSheet.getRange(result.row, 2).setValue(newSheetId);
+      masterSheet.getRange(result.row, 3).setValue(new Date());
       writeLog('INFO', '情報更新', userId);
       successMessage = { type: 'text', text: MESSAGES.registration.updateSuccess };
     } else {
-      // 新規ユーザーとして追加
       masterSheet.appendRow([userId, newSheetId, new Date()]);
       writeLog('INFO', '新規登録', userId);
       successMessage = { type: 'text', text: MESSAGES.registration.success };
     }
 
-    // ユーザーのシートを初期化
     const userSheet = SpreadsheetApp.openById(newSheetId).getSheets()[0];
     initializeSheetTemplate(userSheet);
     protectHeaderRow(userSheet);
@@ -77,8 +75,8 @@ function handleRegistration(event) {
 }
 
 /**
- * ゴミ出し日の問い合わせ（今日、月曜など）を処理する
- * @param {string} command - ユーザーが入力したコマンド（例: '今日', '月'）
+ * ゴミ出し日の問い合わせ（改善版：注意事項がなくても表示）
+ * @param {string} command - ユーザーが入力したコマンド
  * @param {boolean} isDetailed - 詳細表示フラグ
  * @param {string} spreadsheetId - 対象スプレッドシートのID
  * @returns {object|null} 送信するメッセージオブジェクト。該当なければnull
@@ -90,17 +88,16 @@ function handleGarbageQuery(command, isDetailed, spreadsheetId) {
   }
   
   let targetDay;
+  const normalizedCommand = command.replace(/曜|曜日/, '');
+
   if (command === '今日' || command === 'きょう') {
-    const todayIndex = (new Date().getDay() + 6) % 7; // 0=月, 1=火, ... 6=日
+    const todayIndex = (new Date().getDay() + 6) % 7;
     targetDay = `${WEEKDAYS[todayIndex]}曜日`;
-  } else {
-    const dayChar = command.replace(/曜日?/, '');
-    if (WEEKDAYS.includes(dayChar)) {
-      targetDay = `${dayChar}曜日`;
-    }
+  } else if (WEEKDAYS.includes(normalizedCommand)) {
+    targetDay = `${normalizedCommand}曜日`;
   }
   
-  if (!targetDay) return null; // 該当曜日が見つからなければコマンド不明として処理
+  if (!targetDay) return null;
 
   const foundRow = data.find(row => row[COLUMN.DAY_OF_WEEK] === targetDay);
 
@@ -117,10 +114,17 @@ function handleGarbageQuery(command, isDetailed, spreadsheetId) {
     replyText = formatMessage(MESSAGES.query.dayResult, foundRow[COLUMN.DAY_OF_WEEK], foundRow[COLUMN.GARBAGE_TYPE]);
   }
 
-  const note = foundRow[COLUMN.NOTES];
-  if (isDetailed && note && note !== '-') {
-    replyText += formatMessage(MESSAGES.query.notes, note);
+  if (isDetailed) {
+    const note = foundRow[COLUMN.NOTES];
+    if (note && note !== '-') {
+      // 注意事項があれば、それを表示
+      replyText += formatMessage(MESSAGES.query.notes, note);
+    } else {
+      // 注意事項がなければ、「特になし」と表示
+      replyText += formatMessage(MESSAGES.query.notes, '特になし');
+    }
   }
+  // ★ここまで
   
   return { type: 'text', text: replyText };
 }
@@ -138,7 +142,6 @@ function startModification(replyToken, userId) {
     return;
   }
   
-  // 対話状態をキャッシュに保存
   const state = { 
     step: MODIFICATION_FLOW.STEPS.WAITING_FOR_DAY, 
     spreadsheetId: spreadsheetId
@@ -146,7 +149,6 @@ function startModification(replyToken, userId) {
   const cache = CacheService.getUserCache();
   cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
 
-  // 曜日のクイックリプライを送信
   const quickReplyItems = WEEKDAYS.map(day => ({
     type: 'action', action: { type: 'message', label: `${day}曜`, text: `${day}曜` }
   }));
@@ -177,21 +179,17 @@ function continueModification(replyToken, userId, userMessage, cachedState) {
     return;
   }
 
-  // switch文で各ステップの処理を分岐
   switch (state.step) {
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_DAY:
       handleDaySelection_(replyToken, userId, userMessage, state, cache);
       break;
-    
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM:
       handleItemInput_(replyToken, userId, userMessage, state, cache);
       break;
-      
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_NOTE:
       handleNoteInput_(replyToken, userId, userMessage, state, cache);
       break;
-
-    default: // 予期せぬ状態の場合は対話を終了
+    default:
       cache.remove(userId);
       replyToLine(replyToken, [{ type: 'text', text: MESSAGES.error.timeout }]);
       break;
@@ -225,7 +223,19 @@ function handleDaySelection_(replyToken, userId, selectedDay, state, cache) {
   cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
 
   const messageText = formatMessage(MESSAGES.modification.askItem, selectedDay, currentItem);
-  replyToLine(replyToken, [{ type: 'text', text: messageText }]);
+  
+  // ★改善点: クイックリプライを追加
+  const message = {
+    'type': 'text',
+    'text': messageText,
+    'quickReply': {
+      'items': [
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'スキップ', 'text': 'スキップ' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'キャンセル', 'text': 'キャンセル' } }
+      ]
+    }
+  };
+  replyToLine(replyToken, [message]);
 }
 
 /**
@@ -238,7 +248,20 @@ function handleItemInput_(replyToken, userId, newItem, state, cache) {
   cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
 
   const messageText = formatMessage(MESSAGES.modification.askNote, state.currentNote);
-  replyToLine(replyToken, [{ type: 'text', text: messageText }]);
+  
+  // ★改善点: クイックリプライを追加
+  const message = {
+    'type': 'text',
+    'text': messageText,
+    'quickReply': {
+      'items': [
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'スキップ', 'text': 'スキップ' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '注意事項なし', 'text': 'なし' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'キャンセル', 'text': 'キャンセル' } }
+      ]
+    }
+  };
+  replyToLine(replyToken, [message]);
 }
 
 /**
@@ -253,7 +276,7 @@ function handleNoteInput_(replyToken, userId, newNote, state, cache) {
   }
   
   const success = updateGarbageSchedule(userId, state.day, finalItem, finalNote);
-  cache.remove(userId); // 対話終了
+  cache.remove(userId);
 
   if (success) {
     const messageText = formatMessage(MESSAGES.modification.success, state.day, finalItem, finalNote);

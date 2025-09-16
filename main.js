@@ -3,7 +3,6 @@
  */
 
 // LINE Messaging APIのチャネルアクセストークン
-// このトークンはline_api.js内の関数からも参照されます
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 
 /**
@@ -13,7 +12,6 @@ const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty
 function doPost(e) {
   const event = JSON.parse(e.postData.contents).events[0];
 
-  // イベントタイプに応じて処理を振り分ける
   switch (event.type) {
     case 'message':
       handleMessage(event);
@@ -33,13 +31,13 @@ function handleFollowEvent(event) {
 }
 
 /**
- * 全てのメッセージイベントを処理する司令塔
+ * 全てのメッセージイベントを処理する司令塔（「@bot」不要対応版）
  * @param {object} event - LINEイベントオブジェクト
  */
 function handleMessage(event) {
   const replyToken = event.replyToken;
   const userId = event.source.userId;
-  const userMessage = event.message.text;
+  const userMessage = event.message.text.trim(); // 入力の前後の空白を削除
 
   // 1. 対話フローの処理を最優先でチェック
   const cache = CacheService.getUserCache();
@@ -48,52 +46,70 @@ function handleMessage(event) {
     continueModification(replyToken, userId, userMessage, cachedState);
     return;
   }
-
-  // 2. 対話開始コマンド
-  if (userMessage === '変更') {
-    startModification(replyToken, userId);
-    return;
-  }
   
-  // 3. "@bot"で始まるコマンドの処理
-  if (userMessage.startsWith('@bot')) {
-    const spreadsheetId = getSpreadsheetIdByUserId(userId);
-    
-    // 未登録ユーザーでも許可するコマンド
-    const allowedCommandsForNewUser = ['@bot 登録', '@bot 使い方', '@bot ヘルプ'];
-    if (!spreadsheetId && !allowedCommandsForNewUser.some(cmd => userMessage.startsWith(cmd))) {
-      replyToLine(replyToken, [{ type: 'text', text: MESSAGES.error.unregistered }]);
-      return;
-    }
-
-    const replyMessages = createReplyMessage(event, spreadsheetId);
-    if (replyMessages) {
-      replyToLine(replyToken, replyMessages);
+  // 2. ユーザーのスプレッドシートIDを取得
+  const spreadsheetId = getSpreadsheetIdByUserId(userId);
+  
+  // 3. 未登録ユーザーのハンドリング
+  if (!spreadsheetId) {
+    // 登録コマンド以外は受け付けない
+    if (userMessage.startsWith('登録')) {
+      const replyMessage = handleRegistration(event);
+      replyToLine(replyToken, [replyMessage]);
+    } else {
+      // 使い方・ヘルプは許可する
+      const lowerCaseMessage = userMessage.toLowerCase();
+      if (lowerCaseMessage === '使い方' || lowerCaseMessage === 'ヘルプ') {
+        replyToLine(replyToken, [getHelpFlexMessage()]);
+      } else {
+        replyToLine(replyToken, [{ type: 'text', text: MESSAGES.error.unregistered }]);
+      }
     }
     return;
   }
 
-  // 4. 上記のいずれにも当てはまらない場合
-  replyToLine(replyToken, [{ type: 'text', text: MESSAGES.error.defaultFallback }]);
+  // 4. 登録済みユーザーのコマンド処理
+  const replyMessages = createReplyMessage(event, spreadsheetId);
+  if (replyMessages) {
+    replyToLine(replyToken, replyMessages);
+  } else {
+    // どのコマンドにも当てはまらない場合、メインコマンドのクイックリプライを提示
+    const fallbackMessage = {
+      'type': 'text',
+      'text': MESSAGES.error.defaultFallback,
+      'quickReply': {
+        'items': [
+          { 'type': 'action', 'action': { 'type': 'message', 'label': '今日のゴミ', 'text': '今日' } },
+          { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧表示', 'text': '全部' } },
+          { 'type': 'action', 'action': { 'type': 'message', 'label': '予定を変更', 'text': '変更' } },
+          { 'type': 'action', 'action': { 'type': 'message', 'label': '使い方', 'text': '使い方' } },
+        ]
+      }
+    };
+    replyToLine(replyToken, [fallbackMessage]);
+  }
 }
 
-
 /**
- * ユーザーメッセージを解析し、適切なコマンド処理を呼び出す
+ * ユーザーメッセージを解析し、適切なコマンド処理を呼び出す（「@bot」不要対応版）
  * @param {object} event - LINEイベントオブジェクト
- * @param {string|null} spreadsheetId - ユーザーのスプレッドシートID（登録済みの場合）
+ * @param {string} spreadsheetId - ユーザーのスプレッドシートID
  * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
  */
 function createReplyMessage(event, spreadsheetId) {
-  const userMessage = event.message.text;
-  const parts = userMessage.replace('@bot', '').trim().split(/\s+/);
+  const userMessage = event.message.text.trim();
+  const parts = userMessage.split(/\s+/);
   const isDetailed = parts.includes('詳細');
-  const command = parts.filter(p => p !== '詳細').join(' ');
-
+  // 「詳細」を除いた部分をコマンド本体とする
+  const command = parts.filter(p => p !== '詳細').join(' '); 
+  
   let messageObject = null;
 
-  // ユーザーからのコマンドに応じて処理を分岐
+  // switch文で厳密に一致するコマンドを先に処理
   switch (command) {
+    case '変更':
+      startModification(event.replyToken, event.source.userId);
+      return null; // startModification内で返信するため、ここではnullを返す
     case '登録解除':
       messageObject = handleUnregistration(event);
       break;
@@ -101,26 +117,19 @@ function createReplyMessage(event, spreadsheetId) {
     case 'ヘルプ':
       messageObject = getHelpFlexMessage();
       break;
-    case '変更':
-      messageObject = { type: 'text', text: MESSAGES.modification.guide };
-      break;
     case '全部':
-      if (!spreadsheetId) break; // 未登録なら何もしない
       messageObject = createScheduleFlexMessage(isDetailed, spreadsheetId);
       break;
-    default:
-      if (command.startsWith('登録')) {
-        messageObject = handleRegistration(event);
-      } else if (spreadsheetId) { // 登録済みユーザーのみ問い合わせに応答
-        messageObject = handleGarbageQuery(command, isDetailed, spreadsheetId);
-      }
-      break;
+  }
+  
+  // switchで一致しなかった場合、曜日問い合わせなどを試みる
+  if (!messageObject) {
+    messageObject = handleGarbageQuery(command, isDetailed, spreadsheetId);
   }
   
   if (messageObject) {
     return Array.isArray(messageObject) ? messageObject : [messageObject];
   }
 
-  // どのコマンドにも該当しなかった場合
-  return [{ type: 'text', text: MESSAGES.common.commandNotFound }];
+  return null; // 該当コマンドがなければnullを返し、呼び出し元でフォールバック処理
 }
