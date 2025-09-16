@@ -1,13 +1,16 @@
-// flex_messages.js
+/**
+ * @fileoverview LINE Flex MessageのJSONオブジェクトを生成するための関数群です。
+ */
 
 /**
  * 「使い方」の静的なFlex Messageオブジェクトを返す
+ * @returns {object} LINE送信用Flex Messageオブジェクト
  */
 function getHelpFlexMessage() {
   return {
     "type": "flex",
     "altText": MESSAGES.flex.helpAltText,
-    "contents": helpMessageContents
+    "contents": helpMessageContents // この変数はこのファイルの下部で定義されています
   };
 }
 
@@ -23,18 +26,22 @@ function createScheduleFlexMessage(isDetailed, spreadsheetId) {
     return { type: 'text', text: MESSAGES.query.sheetEmpty };
   }
 
-  const weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
-  data.sort((a, b) => weekdays.indexOf(a[COLUMN.DAY_OF_WEEK]) - weekdays.indexOf(b[COLUMN.DAY_OF_WEEK]));
+  const weekdaysOrder = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
+  // スプレッドシートの曜日順にソートする
+  data.sort((a, b) => 
+    weekdaysOrder.indexOf(a[COLUMN.DAY_OF_WEEK]) - weekdaysOrder.indexOf(b[COLUMN.DAY_OF_WEEK])
+  );
 
   const bubbles = data.map(row => {
     const day = row[COLUMN.DAY_OF_WEEK];
-    const item = row[COLUMN.GARBAGE_TYPE];
+    const item = row[COLUMN.GARBAGE_TYPE] || '（未設定）';
     const note = row[COLUMN.NOTES] || '';
 
     const bodyContents = [{ "type": "text", "text": item, "wrap": true, "weight": "bold", "size": "md" }];
+    // 詳細表示が有効で、注意事項が「-」ではない場合に内容を追加
     if (isDetailed && note && note !== '-') {
       bodyContents.push({ "type": "separator", "margin": "lg" });
-      bodyContents.push({ "type": "text", "text": note, "wrap": true });
+      bodyContents.push({ "type": "text", "text": note, "wrap": true, "size": "sm", "color": "#666666" });
     }
 
     return {
@@ -66,6 +73,11 @@ function createScheduleFlexMessage(isDetailed, spreadsheetId) {
   };
 }
 
+/**
+ * 使い方ガイドのFlex Messageコンテンツ
+ * ※元のコードで省略されていた `helpMessageContents` の内容をここにペーストしてください。
+ * @const {object}
+ */
 const helpMessageContents = {
     "type": "carousel",
     "contents": [

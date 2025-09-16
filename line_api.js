@@ -1,4 +1,6 @@
-// line_api.js
+/**
+ * @fileoverview LINE Messaging APIとの通信を行うための関数群です。
+ */
 
 /**
  * LINE Messaging APIにリプライメッセージを送信する
@@ -6,8 +8,8 @@
  * @param {Array<object>} messages - 送信するメッセージオブジェクトの配列
  */
 function replyToLine(replyToken, messages) {
-  // ... (ロジックは同じ、コメント整備)
   try {
+    // UrlFetchApp.fetchはGoogleのサーバーからHTTPリクエストを送信するメソッド
     UrlFetchApp.fetch('https://api.line.me/v2/bot/message/reply', {
       'headers': {
         'Content-Type': 'application/json; charset=UTF-8',
@@ -18,8 +20,10 @@ function replyToLine(replyToken, messages) {
         'replyToken': replyToken,
         'messages': messages,
       }),
+      'muteHttpExceptions': true // APIからのエラーレスポンス(4xx, 5xx)で例外をスローさせない
     });
   } catch (e) {
+    // ネットワークエラーなど、リクエスト自体が失敗した場合のログ
     console.error(`LINEへの返信でエラーが発生: ${e.message}`);
   }
 }
@@ -30,17 +34,23 @@ function replyToLine(replyToken, messages) {
  * @returns {object|null} 成功すればプロフィールオブジェクト、失敗すればnull
  */
 function getUserProfile(userId) {
-  // ... (ロジックは同じ、コメント整備)
   try {
     const url = `https://api.line.me/v2/bot/profile/${userId}`;
     const response = UrlFetchApp.fetch(url, {
       'headers': {
         'Authorization': 'Bearer ' + CHANNEL_ACCESS_TOKEN,
-      }
+      },
+      'muteHttpExceptions': true
     });
-    return JSON.parse(response.getContentText());
+    // レスポンスコードが200（成功）の場合のみパースして返す
+    if (response.getResponseCode() === 200) {
+      return JSON.parse(response.getContentText());
+    } else {
+      console.error(`プロフィールの取得に失敗: ${response.getContentText()}`);
+      return null;
+    }
   } catch (e) {
-    console.error(`ユーザープロフィールの取得に失敗: ${e.message}`);
+    console.error(`ユーザープロフィールの取得でエラーが発生: ${e.message}`);
     return null;
   }
 }

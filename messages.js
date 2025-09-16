@@ -1,8 +1,11 @@
-// messages.js
+/**
+ * @fileoverview Botがユーザーに送信するすべてのメッセージテキストを管理します。
+ */
 
 /**
  * Botがユーザーに送信するすべてのメッセージを管理するオブジェクト
  * 動的な部分は {0}, {1}... のプレースホルダーで定義
+ * @const
  */
 const MESSAGES = {
   // 共通
@@ -14,7 +17,6 @@ const MESSAGES = {
   },
   // イベント
   event: {
-    // join: '...' // ★ 削除
     follow: '友だち追加ありがとうございます！\n\nGoogleスプレッドシートを使って、あなたのゴミ出しスケジュールを管理します。\n\nまずは「@bot 使い方」と送信して、詳しい利用方法をご確認ください。',
   },
   // 登録
@@ -37,7 +39,6 @@ const MESSAGES = {
     askNote: '現在の注意事項は『{0}』です。\n新しい注意事項を入力してください。\n\n現在のままにする場合は「スキップ」、注意事項を削除する場合は「なし」と入力してください。',
     success: '✅【{0}】の予定を更新しました。\n\n品目: {1}\n注意事項: {2}',
     invalidDay: 'ボタンから曜日を選択するか、「キャンセル」と入力してください。',
-    // noGroup, multiGroup, confirmGroup, confirmUser は不要になったため削除
   },
   // ゴミ出し日問い合わせ
   query: {
@@ -62,15 +63,16 @@ const MESSAGES = {
 };
 
 /**
- * メッセージのプレースホルダーを動的な値に置き換えるヘルパー関数
+ * メッセージのプレースホルダー（{0}, {1}など）を動的な値に置き換えるヘルパー関数
  * @param {string} text - プレースホルダーを含むメッセージ文字列
- * @param {...any} args - 置き換える値 ({0}, {1}...)
+ * @param {...any} args - 置き換える値
  * @returns {string} フォーマット済みのメッセージ文字列
  */
 function formatMessage(text, ...args) {
+  let formattedText = text;
   for (let i = 0; i < args.length; i++) {
     const placeholder = new RegExp(`\\{${i}\\}`, 'g');
-    text = text.replace(placeholder, args[i]);
+    formattedText = formattedText.replace(placeholder, args[i]);
   }
-  return text;
+  return formattedText;
 }
