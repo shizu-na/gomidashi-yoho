@@ -6,19 +6,19 @@
 
 // LINE Messaging APIのチャネルアクセストークン
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
-// [追加] チャネルシークレットをプロパティから取得
-const CHANNEL_SECRET = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_SECRET');
+// ★ 修正: 秘密のトークンをプロパティから取得
+const SECRET_TOKEN = PropertiesService.getScriptProperties().getProperty('SECRET_TOKEN');
 
 /**
  * LINEからのWebhookリクエストを処理するメイン関数
  * @param {GoogleAppsScript.Events.DoPost} e - Webhookイベントオブジェクト
  */
 function doPost(e) {
-  // [追加] 署名の検証
-  const signature = e.headers['x-line-signature'];
-  const body = e.postData.contents;
-  if (!validateSignature(body, signature)) {
-    // 署名が無効な場合は、何もせず終了する
+  // ★ 変更: パラメータから受け取ったトークンを検証する
+  const receivedToken = e.parameter.token;
+  if (receivedToken !== SECRET_TOKEN) {
+    // トークンが一致しない、または存在しない場合は不正なリクエストとみなし、処理を終了する
+    console.log("不正なリクエストです。");
     return;
   }
 
@@ -32,18 +32,6 @@ function doPost(e) {
       handleFollowEvent(event);
       break;
   }
-}
-
-/**
- * [追加] LINEからの署名を検証する関数
- * @param {string} body - リクエストボディ
- * @param {string} signature - X-Line-Signatureヘッダー
- * @returns {boolean} - 検証結果
- */
-function validateSignature(body, signature) {
-  const hash = Utilities.computeHmacSha256Signature(body, CHANNEL_SECRET);
-  const base64Hash = Utilities.base64Encode(hash);
-  return base64Hash === signature;
 }
 
 /**
