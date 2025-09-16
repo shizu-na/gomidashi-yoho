@@ -104,26 +104,14 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 利用開始",
+            "text": "● 利用開始：「登録」",
             "weight": "bold",
             "size": "md",
             "wrap": true
           },
           {
             "type": "text",
-            "text": "このBotに話しかけると自動で利用が開始されます。",
-            "align": "center",
-            "wrap": true,
-            "margin": "md",
-            "size": "sm"
-          },
-          {
-            "type": "separator",
-            "margin": "xl"
-          },
-          {
-            "type": "text",
-            "text": "● 利用の停止（退会）",
+            "text": "● 利用の停止：「退会」",
             "weight": "bold",
             "margin": "lg",
             "size": "md",
@@ -131,10 +119,11 @@ const helpMessageContents = {
           },
           {
             "type": "text",
-            "text": "「退会」",
+            "text": "データは一時的に保管され、\n再開も可能です。",
             "align": "center",
             "wrap": true,
-            "margin": "md"
+            "margin": "md",
+            "size": "sm"
           }
         ],
         "paddingAll": "15px",
@@ -166,25 +155,14 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 今日のゴミを確認",
+            "text": "● 「今日」「明日 詳細」",
             "weight": "bold",
             "size": "md",
             "wrap": true
           },
           {
             "type": "text",
-            "text": "「今日」「今日 詳細」",
-            "align": "center",
-            "wrap": true,
-            "margin": "md"
-          },
-          {
-            "type": "separator",
-            "margin": "xl"
-          },
-          {
-            "type": "text",
-            "text": "● 特定の曜日を確認",
+            "text": "● 「月曜」「火 詳細」",
             "weight": "bold",
             "margin": "lg",
             "size": "md",
@@ -192,10 +170,11 @@ const helpMessageContents = {
           },
           {
             "type": "text",
-            "text": "「月曜」「火曜 詳細」",
+            "text": "「詳細」をつけると注意事項\nと一緒に確認できる。",
             "align": "center",
             "wrap": true,
-            "margin": "md"
+            "margin": "md",
+            "size": "sm"
           }
         ],
         "paddingAll": "15px",
@@ -227,36 +206,18 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 全ての予定を確認",
+            "text": "● 「全部」「全部 詳細」",
             "weight": "bold",
             "size": "md",
             "wrap": true
           },
           {
             "type": "text",
-            "text": "「全部」",
+            "text": "1週間分の予定を一覧で確認できる。「詳細」をつけると注意事項と一緒に確認できる。",
             "align": "center",
             "margin": "md",
-            "wrap": true
-          },
-          {
-            "type": "separator",
-            "margin": "lg"
-          },
-          {
-            "type": "text",
-            "text": "● 全ての詳細を確認",
-            "weight": "bold",
-            "margin": "lg",
-            "size": "md",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "「全部 詳細」",
-            "align": "center",
-            "margin": "md",
-            "wrap": true
+            "wrap": true,
+            "size": "sm"
           }
         ],
         "paddingAll": "15px",
@@ -288,36 +249,18 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 対話形式で変更",
+            "text": "● 「変更」",
             "size": "md",
             "weight": "bold",
             "wrap": true
           },
           {
             "type": "text",
-            "text": "「変更」と送信",
             "margin": "md",
             "align": "center",
-            "wrap": true
-          },
-          {
-            "type": "separator",
-            "margin": "xl"
-          },
-          {
-            "type": "text",
-            "text": "● その他",
-            "size": "md",
-            "weight": "bold",
-            "margin": "lg",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "「使い方」で\nこのガイドを再度表示",
-            "align": "center",
-            "margin": "md",
-            "wrap": true
+            "wrap": true,
+            "size": "sm",
+            "text": "ゴミの品目は20文字、\n注意事項は100文字まで。\nスキップやキャンセルも可"
           }
         ],
         "spacing": "sm",
