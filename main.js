@@ -170,9 +170,7 @@ function handleMessage(event) {
 function createReplyMessage(event) {
   const userMessage = event.message.text.trim();
   const userId = event.source.userId;
-  const parts = userMessage.split(/\s+/);
-  const isDetailed = parts.includes('詳細');
-  const command = parts.filter(p => p !== '詳細').join(' ');
+  const command = userMessage;
 
   let messageObject = null;
 
@@ -185,7 +183,8 @@ function createReplyMessage(event) {
       messageObject = getHelpFlexMessage();
       break;
     case '一覧': {
-      const carouselMessage = createScheduleFlexMessage(isDetailed, userId);
+      // ★ 変更: createScheduleFlexMessageに渡す引数をuserIdのみに変更
+      const carouselMessage = createScheduleFlexMessage(userId);
       
       if (carouselMessage && carouselMessage.type === 'flex') {
         const promptMessage = {
@@ -201,7 +200,7 @@ function createReplyMessage(event) {
   }
 
   if (!messageObject) {
-    messageObject = handleGarbageQuery(command, isDetailed, userId);
+    messageObject = handleGarbageQuery(command, false, userId);
   }
 
   if (messageObject) {

@@ -41,8 +41,11 @@ function getUserRecord(userId) {
     const sheet = db.getSheetByName('Users');
     if (!sheet) return null;
 
-    // ★ 変更: TextFinderを使用してA列（userId列）を高速に検索
-    const range = sheet.getRange("A:A").createTextFinder(userId).findNext();
+    // TextFinderを使用してA列（userId列）を高速に検索
+    const range = sheet.getRange("A:A")
+    .createTextFinder(userId.toString()) // 文字列に変換
+    .matchEntireCell(true) // 完全一致のみを対象
+    .findNext();
 
     if (range) {
       const rowNum = range.getRow();

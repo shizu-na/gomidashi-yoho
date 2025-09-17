@@ -23,7 +23,7 @@ function getHelpFlexMessage() {
 function createScheduleFlexMessage(userId) { 
   const data = getSchedulesByUserId(userId);
   if (data.length === 0) {
-    return { type: 'text', text: MESSAGES.query.sheetEmpty };
+  return getMenuMessage(MESSAGES.query.sheetEmpty);
   }
 
   const sortedData = data.sort((a, b) =>
