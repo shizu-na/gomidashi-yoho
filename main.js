@@ -43,7 +43,13 @@ function handleFollowEvent(event) {
 
   if (!userRecord) {
     // 全くの新規ユーザー
-    replyToLine(replyToken, [getRegistrationPromptMessage(MESSAGES.event.follow_new)]);
+    const textArray = MESSAGES.event.follow_new.slice(); // 元の配列を壊さないようにコピー
+    const lastText = textArray.pop(); // 最後の文章を取り出す
+    
+    const messages = textArray.map(text => ({ type: 'text', text: text })); // 途中までのメッセージを作成
+    messages.push(getRegistrationPromptMessage(lastText)); // 最後の文章にボタンを付けて追加
+    
+    replyToLine(replyToken, messages);
   } else if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
     // 退会済みのユーザー
     replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.event.follow_rejoin_prompt)]);
@@ -130,8 +136,14 @@ function handleMessage(event) {
     if (userMessage === 'はじめる') {
       createNewUser(userId);
       writeLog('INFO', '新規ユーザー登録', userId);
-      // ★ 変更: 行き止まり解消のためメニューを追加
-      replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.success)]);
+
+      const textArray = MESSAGES.registration.success.slice();
+      const lastText = textArray.pop();
+
+      const messages = textArray.map(text => ({ type: 'text', text: text }));
+      messages.push(getMenuMessage(lastText)); // 最後の文章にメニューを付けて追加
+
+      replyToLine(replyToken, messages);
     } else if (userMessage === '使い方' || userMessage === 'ヘルプ') {
       replyToLine(replyToken, [getHelpFlexMessage()]);
     } else {
