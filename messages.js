@@ -61,6 +61,7 @@ const MESSAGES = {
   flex: {
     helpAltText: '使い方ガイド',
     scheduleAltText: 'ゴミ出しスケジュール一覧',
+    schedulePrompt: '変更したい曜日があれば、カードをタップして編集できます✨'
   },
 };
 

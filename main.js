@@ -84,28 +84,24 @@ function parseQueryString_(query) {
 
 /**
  * ★ 修正: ポストバックイベントを専門に処理する関数
- * 連続タップ防止のロック処理を追加。
+ * 対話セッション全体でロックをかけるように修正。
  * @param {object} event - LINEイベントオブジェクト
  */
 function handlePostback(event) {
   const userId = event.source.userId;
   const cache = CacheService.getUserCache();
-  const lockKey = `lock_${userId}`; // ユーザーごとに一意なロックキーを定義
-  
-  // 1. まずロックがかかっているか確認
-  const isLocked = cache.get(lockKey);
 
-  // 2. もしロック中（isLockedがnullでない）なら、何もせず処理を終了
-  if (isLocked) {
-    return; // このreturnが重要！
+  // 1. 現在の対話状態（state）をキャッシュから取得
+  const currentState = cache.get(userId);
+
+  // 2. もし対話状態が存在するなら、すでに他の対話が進行中なので処理を終了
+  if (currentState) {
+    return;
   }
 
-  // 3. ロックされていなければ、5秒間有効なロックをかける
-  // 第3引数の'5'がロック時間（秒）。Botの応答時間に合わせて調整してください。
-  cache.put(lockKey, 'true', 5);
   const replyToken = event.replyToken;
   const postbackData = event.postback.data;
-
+  
   const params = parseQueryString_(postbackData);
   const action = params['action'];
 
@@ -198,9 +194,24 @@ function createReplyMessage(event) {
     case 'ヘルプ':
       messageObject = getHelpFlexMessage();
       break;
-    case '一覧':
-      messageObject = createScheduleFlexMessage(isDetailed, userId);
+    case '一覧': { // caseの後に {} をつけてスコープを明確にします
+      const carouselMessage = createScheduleFlexMessage(isDetailed, userId);
+
+      // createScheduleFlexMessageがFlex Messageを返した場合のみ（＝予定が空でない場合）
+      // 補足のテキストメッセージを追加します。
+      if (carouselMessage && carouselMessage.type === 'flex') {
+        const promptMessage = {
+          type: 'text',
+          text: MESSAGES.flex.schedulePrompt
+        };
+        // 2つのメッセージを配列にして返す
+        return [carouselMessage, promptMessage];
+      }
+      
+      // 予定が空の場合は、そのままテキストメッセージが返るので、下の処理に任せます
+      messageObject = carouselMessage;
       break;
+    }
   }
 
   if (!messageObject) {
