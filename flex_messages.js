@@ -85,65 +85,14 @@ const helpMessageContents = {
   "contents": [
     {
       "type": "bubble",
-      "size": "deca",
+      "size": "hecto",
       "header": {
         "type": "box",
         "layout": "vertical",
         "contents": [
           {
             "type": "text",
-            "text": "基本操作",
-            "color": "#FFFFFF",
-            "weight": "bold",
-            "align": "center",
-            "size": "lg"
-          }
-        ],
-        "backgroundColor": "#6C757D",
-        "paddingAll": "10px"
-      },
-      "body": {
-        "type": "box",
-        "layout": "vertical",
-        "contents": [
-          {
-            "type": "text",
-            "text": "● 利用開始：「登録」",
-            "weight": "bold",
-            "size": "md",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "● 利用の停止：「退会」",
-            "weight": "bold",
-            "margin": "lg",
-            "size": "md",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "データは一時的に保管され、\n再開も可能です。",
-            "align": "center",
-            "wrap": true,
-            "margin": "md",
-            "size": "sm"
-          }
-        ],
-        "paddingAll": "15px",
-        "spacing": "sm"
-      }
-    },
-    {
-      "type": "bubble",
-      "size": "deca",
-      "header": {
-        "type": "box",
-        "layout": "vertical",
-        "contents": [
-          {
-            "type": "text",
-            "text": "予定の確認",
+            "text": "📅 スケジュール一覧・編集",
             "color": "#FFFFFF",
             "weight": "bold",
             "align": "center",
@@ -151,7 +100,7 @@ const helpMessageContents = {
           }
         ],
         "backgroundColor": "#176FB8",
-        "paddingAll": "10px"
+        "paddingAll": "12px"
       },
       "body": {
         "type": "box",
@@ -159,42 +108,52 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 「今日」「明日 詳細」",
-            "weight": "bold",
-            "size": "md",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "● 「月曜」「火 詳細」",
-            "weight": "bold",
-            "margin": "lg",
-            "size": "md",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "「詳細」をつけると注意事項\nと一緒に確認できる。",
-            "align": "center",
+            "text": "1週間のごみ出し予定を表示",
             "wrap": true,
-            "margin": "md",
-            "size": "sm"
+            "size": "sm",
+            "align": "center",
+            "weight": "regular"
+          },
+          {
+            "type": "text",
+            "text": "タップすると、その曜日の\n予定を編集できます。",
+            "margin": "none",
+            "wrap": true,
+            "size": "sm",
+            "align": "center",
+            "weight": "bold"
           }
         ],
-        "paddingAll": "15px",
-        "spacing": "sm"
+        "paddingAll": "15px"
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "message",
+              "label": "「一覧」を送る",
+              "text": "一覧"
+            },
+            "style": "primary",
+            "height": "sm"
+          }
+        ],
+        "paddingTop": "0px"
       }
     },
     {
       "type": "bubble",
-      "size": "deca",
+      "size": "hecto",
       "header": {
         "type": "box",
         "layout": "vertical",
         "contents": [
           {
             "type": "text",
-            "text": "予定の一覧表示",
+            "text": "🚮 今日のゴミを確認",
             "color": "#FFFFFF",
             "weight": "bold",
             "align": "center",
@@ -202,7 +161,7 @@ const helpMessageContents = {
           }
         ],
         "backgroundColor": "#5A9E46",
-        "paddingAll": "10px"
+        "paddingAll": "12px"
       },
       "body": {
         "type": "box",
@@ -210,42 +169,52 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 「一覧」「一覧 詳細」",
-            "weight": "bold",
-            "size": "md",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "text": "1週間分の予定を一覧で確認できる。「詳細」をつけると注意事項と一緒に確認できる。",
-            "align": "center",
-            "margin": "md",
+            "text": "今日のごみ出し予定と、\n登録した注意事項を\nすぐに確認できます。",
             "wrap": true,
-            "size": "sm"
+            "size": "sm",
+            "align": "center"
           }
         ],
         "paddingAll": "15px",
         "spacing": "sm"
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "message",
+              "label": "「今日」を送る",
+              "text": "今日"
+            },
+            "style": "primary",
+            "color": "#5A9E46",
+            "height": "sm"
+          }
+        ],
+        "paddingTop": "0px"
       }
     },
     {
       "type": "bubble",
-      "size": "deca",
+      "size": "hecto",
       "header": {
         "type": "box",
         "layout": "vertical",
         "contents": [
           {
             "type": "text",
-            "text": "予定の変更",
-            "size": "lg",
+            "text": "🗑️ 明日のゴミを確認",
             "color": "#FFFFFF",
             "weight": "bold",
-            "align": "center"
+            "align": "center",
+            "size": "lg"
           }
         ],
-        "backgroundColor": "#DC3545",
-        "paddingAll": "10px"
+        "backgroundColor": "#5A9E46",
+        "paddingAll": "12px"
       },
       "body": {
         "type": "box",
@@ -253,22 +222,84 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 「変更」",
-            "size": "md",
-            "weight": "bold",
-            "wrap": true
-          },
-          {
-            "type": "text",
-            "margin": "md",
-            "align": "center",
+            "text": "明日のごみ出し予定と、\n登録した注意事項を\nすぐに確認できます。",
             "wrap": true,
             "size": "sm",
-            "text": "ゴミの品目は20文字、\n注意事項は100文字まで。\nスキップやキャンセルも可"
+            "align": "center"
           }
         ],
-        "spacing": "sm",
-        "paddingAll": "15px"
+        "paddingAll": "15px",
+        "spacing": "sm"
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "message",
+              "label": "「明日」を送る",
+              "text": "明日"
+            },
+            "style": "primary",
+            "color": "#5A9E46",
+            "height": "sm"
+          }
+        ],
+        "paddingTop": "0px"
+      }
+    },
+    {
+      "type": "bubble",
+      "size": "hecto",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "⚙️ 利用の停止（退会）",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center",
+            "size": "lg"
+          }
+        ],
+        "backgroundColor": "#6C757D",
+        "paddingAll": "12px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "利用を停止します。\nデータは削除されないため、\nいつでも利用を再開できます。",
+            "wrap": true,
+            "size": "sm",
+            "align": "center"
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "sm"
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "message",
+              "label": "「退会」を送る",
+              "text": "退会"
+            },
+            "style": "secondary",
+            "height": "sm"
+          }
+        ],
+        "paddingTop": "0px"
       }
     }
   ]
