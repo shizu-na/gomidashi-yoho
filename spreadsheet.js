@@ -196,3 +196,20 @@ function writeLog(level, message, ownerId = '') {
     console.error(`ログの書き込みに失敗しました: ${e.message}`);
   }
 }
+
+/**
+ * スプレッドシートの数式インジェクションを防ぐために入力値をサニタイズ（無害化）します。
+ * @private
+ * @param {string} input - ユーザーからの入力文字列
+ * @returns {string} サニタイズ後の文字列
+ */
+function sanitizeInput_(input) {
+  if (typeof input !== 'string') {
+    return input;
+  }
+  // =, +, -, @ で始まる場合は、先頭にシングルクォートを追加して数式化を防ぐ
+  if (['=', '+', '-', '@'].includes(input.charAt(0))) {
+    return "'" + input;
+  }
+  return input;
+}

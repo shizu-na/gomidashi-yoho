@@ -172,7 +172,10 @@ function handleNoteInput_(replyToken, userId, newNote, state, cache) {
     finalNote = (newNote === 'なし') ? '-' : newNote;
   }
 
-  const success = updateSchedule(userId, state.day, finalItem, finalNote);
+  const sanitizedItem = sanitizeInput_(finalItem);
+  const sanitizedNote = sanitizeInput_(finalNote);
+
+  const success = updateSchedule(userId, state.day, sanitizedItem, sanitizedNote);
   cache.remove(userId);
 
   if (success) {
