@@ -1,7 +1,5 @@
-// spreadsheet.js
 /**
  * @fileoverview Googleスプレッドシートの操作に関連する関数群です。
- * [改修] 全面的に書き換え。単一のスプレッドシート内の「Users」「Schedules」シートを操作する形に変更。
  */
 
 // =================================================================
@@ -9,7 +7,7 @@
 // =================================================================
 
 /**
- * データベースのスプレッドシートオブジェクトを取得する
+ * データベースのスプレッドシートオブジェクトを取得します。（プライベート関数）
  * @private
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet|null}
  */
@@ -32,7 +30,7 @@ function getDatabase_() {
 // =================================================================
 
 /**
- * Usersシートから指定されたuserIdのレコードを検索する
+ * Usersシートから指定されたuserIdのレコードを高速に検索します。
  * @param {string} userId - 検索するユーザーID
  * @returns {{row: number, status: string}|null} 見つかった行番号とステータス、なければnull
  */
@@ -43,24 +41,25 @@ function getUserRecord(userId) {
     const sheet = db.getSheetByName('Users');
     if (!sheet) return null;
 
-    const data = sheet.getRange(2, COLUMNS_USER.USER_ID + 1, sheet.getLastRow() - 1, 2).getValues();
-    for (let i = 0; i < data.length; i++) {
-      if (data[i][0] === userId) {
-        return {
-          row: i + 2, // GASの行番号は1から、ヘッダー分を考慮
-          status: data[i][1]
-        };
-      }
+    // ★ 変更: TextFinderを使用してA列（userId列）を高速に検索
+    const range = sheet.getRange("A:A").createTextFinder(userId).findNext();
+
+    if (range) {
+      const rowNum = range.getRow();
+      const status = sheet.getRange(rowNum, COLUMNS_USER.STATUS + 1).getValue();
+      return { row: rowNum, status: status };
     }
-    return null;
+
+    return null; // 見つからなかった場合
   } catch (e) {
     writeLog('ERROR', `ユーザーレコード検索でエラー: ${e.message}`, userId);
     return null;
   }
 }
 
+
 /**
- * 新規ユーザーをUsersシートとSchedulesシートに作成する
+ * 新規ユーザーをUsersシートとSchedulesシートに作成します。
  * @param {string} userId - 作成するユーザーID
  */
 function createNewUser(userId) {
@@ -71,10 +70,8 @@ function createNewUser(userId) {
     const schedulesSheet = db.getSheetByName('Schedules');
     const now = new Date();
 
-    // Usersシートに行を追加
     usersSheet.appendRow([userId, USER_STATUS.ACTIVE, now, now]);
 
-    // Schedulesシートに7日分の初期データを追加
     const initialSchedules = WEEKDAYS_FULL.map(day => {
       if (day === '日曜日') {
         return [userId, day, '（回収なし）', '-'];
@@ -89,7 +86,7 @@ function createNewUser(userId) {
 }
 
 /**
- * ユーザーのステータスを更新する
+ * ユーザーのステータスを更新します。
  * @param {string} userId - 更新対象のユーザーID
  * @param {string} status - 新しいステータス
  */
@@ -114,7 +111,7 @@ function updateUserStatus(userId, status) {
 // =================================================================
 
 /**
- * 指定されたユーザーIDのゴミ出しスケジュールを全件取得する
+ * 指定されたユーザーIDのゴミ出しスケジュールを全件取得します。
  * @param {string} userId - データを取得するユーザーのID
  * @returns {Array<Array<string>>} ゴミ出しスケジュールのデータ配列
  */
@@ -135,7 +132,7 @@ function getSchedulesByUserId(userId) {
 }
 
 /**
- * 指定ユーザーの特定曜日のスケジュールを更新する
+ * 指定ユーザーの特定曜日のスケジュールを更新します。
  * @param {string} userId - 更新対象のユーザーID
  * @param {string} day - 更新対象の曜日 (例: '月曜日')
  * @param {string} item - 新しい品目
@@ -150,10 +147,9 @@ function updateSchedule(userId, day, item, note) {
     const allData = sheet.getDataRange().getValues();
 
     // userIdと曜日が一致する行を探す
-    for (let i = 1; i < allData.length; i++) { // i=0はヘッダー
+    for (let i = 1; i < allData.length; i++) {
       if (allData[i][COLUMNS_SCHEDULE.USER_ID] === userId && allData[i][COLUMNS_SCHEDULE.DAY_OF_WEEK] === day) {
         const rowNum = i + 1;
-        // 品目と注意事項を一度に更新
         sheet.getRange(rowNum, COLUMNS_SCHEDULE.GARBAGE_TYPE + 1, 1, 2).setValues([[item, note]]);
         return true;
       }
@@ -171,7 +167,7 @@ function updateSchedule(userId, day, item, note) {
 // =================================================================
 
 /**
- * ログシートにメッセージを記録する
+ * ログシートにメッセージを記録します。
  * @param {string} level - ログレベル ('INFO', 'ERROR')
  * @param {string} message - 記録するメッセージ
  * @param {string} [ownerId=''] - 関連するユーザーIDなど（任意）

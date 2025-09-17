@@ -1,28 +1,26 @@
-// flex_messages.js
 /**
  * @fileoverview LINE Flex MessageのJSONオブジェクトを生成するための関数群です。
- * [改修] スケジュール取得をuserIdベースに変更。
  */
 
 /**
- * 「使い方」の静的なFlex Messageオブジェクトを返す
+ * 「ヘルプ」コマンド用のFlex Messageオブジェクトを返します。
  * @returns {object} LINE送信用Flex Messageオブジェクト
  */
 function getHelpFlexMessage() {
   return {
     "type": "flex",
     "altText": MESSAGES.flex.helpAltText,
-    "contents": helpMessageContents
+    "contents": helpMessageContents 
   };
 }
 
 /**
- * 全曜日のスケジュール一覧Flex Messageを動的に生成する
- * @param {boolean} isDetailed - 詳細（注意事項）を含めるかどうか
+ * 全曜日のスケジュール一覧Flex Messageを動的に生成します。
+ * 注意事項がある場合は、常に表示します。
  * @param {string} userId - 対象ユーザーのID
  * @returns {object} LINE送信用Flex Messageオブジェクト
  */
-function createScheduleFlexMessage(isDetailed, userId) {
+function createScheduleFlexMessage(userId) { 
   const data = getSchedulesByUserId(userId);
   if (data.length === 0) {
     return { type: 'text', text: MESSAGES.query.sheetEmpty };
@@ -38,7 +36,8 @@ function createScheduleFlexMessage(isDetailed, userId) {
     const note = row[COLUMNS_SCHEDULE.NOTES] || '';
 
     const bodyContents = [{ "type": "text", "text": item, "wrap": true, "weight": "bold", "size": "md" }];
-    if (isDetailed && note && note !== '-') {
+    
+    if (note && note !== '-') {
       bodyContents.push({ "type": "separator", "margin": "lg" });
       bodyContents.push({ "type": "text", "text": note, "wrap": true, "size": "sm", "color": "#666666" });
     }
@@ -60,9 +59,9 @@ function createScheduleFlexMessage(isDetailed, userId) {
         "contents": bodyContents
       },
       "action": {
-        "type": "postback", // アクションタイプ
-        "label": "変更",    // タップ領域のラベル（視覚的には影響なし）
-        "data": `action=startChange&day=${day}` // Botに送信される隠しデータ
+        "type": "postback",
+        "label": "変更",
+        "data": `action=startChange&day=${day}`
       }
     };
   });
@@ -78,7 +77,7 @@ function createScheduleFlexMessage(isDetailed, userId) {
 }
 
 /**
- * 使い方ガイドのFlex Messageコンテンツ
+ * 使い方ガイドのFlex Messageコンテンツ。
  * @const {object}
  */
 const helpMessageContents = {
