@@ -139,7 +139,7 @@ function getSchedulesByUserId(userId) {
  * @param {string} userId - 更新対象のユーザーID
  * @param {string} day - 更新対象の曜日 (例: '月曜日')
  * @param {string} item - 新しい品目
- * @param {string} note - 新しい注意事項
+ * @param {string} note - 新しいメモ
  * @returns {boolean} 成功すればtrue、失敗すればfalse
  */
 function updateSchedule(userId, day, item, note) {

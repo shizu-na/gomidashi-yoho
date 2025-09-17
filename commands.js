@@ -20,7 +20,7 @@ function handleUnregistration(userId) {
 
 /**
  * 「今日」「明日」のゴミ出し日問い合わせを処理します。
- * 問い合わせ結果には常に注意事項（詳細）も表示します。
+ * 問い合わせ結果には常にメモ（詳細）も表示します。
  * @param {string} command - ユーザーが入力したコマンド
  * @param {boolean} isDetailed - 詳細表示フラグ（現在は未使用だが将来の拡張用に残置）
  * @param {string} userId - 対象ユーザーのID
@@ -134,7 +134,10 @@ function continueModification(replyToken, userId, userMessage, cachedState) {
 function handleItemInput_(replyToken, userId, newItem, state, cache) {
   if (newItem !== 'スキップ' && newItem.length > VALIDATION_LIMITS.ITEM_MAX_LENGTH) {
     const errorMessage = getModificationItemPromptMessage(state.day, state.currentItem);
-    errorMessage.text = MESSAGES.modification.itemTooLong;
+    errorMessage.text = formatMessage(
+      MESSAGES.modification.itemTooLong,
+      VALIDATION_LIMITS.ITEM_MAX_LENGTH // プレースホルダー{0}に20が入る
+    );
     replyToLine(replyToken, [errorMessage]);
     return;
   }
@@ -149,13 +152,16 @@ function handleItemInput_(replyToken, userId, newItem, state, cache) {
 }
 
 /**
- * [対話] 注意事項入力の処理（プライベート関数）
+ * [対話] メモ入力の処理（プライベート関数）
  * @private
  */
 function handleNoteInput_(replyToken, userId, newNote, state, cache) {
   if (newNote !== 'スキップ' && newNote !== 'なし' && newNote.length > VALIDATION_LIMITS.NOTE_MAX_LENGTH) {
     const errorMessage = getModificationNotePromptMessage(state.currentNote);
-    errorMessage.text = MESSAGES.modification.noteTooLong;
+    errorMessage.text = formatMessage(
+      MESSAGES.modification.noteTooLong,
+      VALIDATION_LIMITS.NOTE_MAX_LENGTH // プレースホルダー{0}に100が入る
+    );
     replyToLine(replyToken, [errorMessage]);
     return;
   }
