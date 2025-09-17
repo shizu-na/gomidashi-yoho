@@ -25,20 +25,20 @@ const MESSAGES = {
   // 登録
   registration: {
     // ★ 変更: 登録後の案内メッセージを新しいフローに合わせる
-    success: '✅ 登録が完了しました！\n\n「一覧」と送信して、曜日ごとのごみ出し予定を確認・変更してみましょう。\n\n使い方が分からない時は「ヘルプ」と送信してください。',
+    success: '✅ ありがとうございます。早速、「一覧」と送ってください！\n\nすると、予定を確認できます。そこから情報を変更することができます。\n\n使い方が分からない時は「ヘルプ」と送信してください。',
     // [追加] 未登録ユーザーに登録を促すメッセージ
-    prompt: 'ご利用には、まず「はじめる」を押して、ご利用を開始してください。',
+    prompt: 'ご利用には、まず「はじめる」を押してから開始してください。',
   },
   // 退会・再開
   unregistration: {
-    success: '✅ 退会処理が完了しました。ご利用ありがとうございました。\nまた使いたくなったら、いつでも話しかけてください！',
-    unsubscribed: '現在、通知や機能が停止されています。利用を再開しますか？',
+    success: 'ご利用ありがとうございました。\nまた使いたくなったら、いつでも話しかけてください！',
+    unsubscribed: '現在、機能が停止されています。利用を再開しますか？',
     reactivate: '✅ 利用を再開しました！',
   },
   // 変更（対話）
   modification: {
-    askItem: '現在の【{0}】の品目は『{1}』です。\n新しいゴミの品目を入力してください。\n\n現在の設定のままにする場合は「スキップ」、入力をやめる場合は「キャンセル」と送信してください。',
-    askNote: '現在の注意事項は『{0}』です。\n新しい注意事項を入力してください。\n\n現在のままにする場合は「スキップ」、注意事項を削除する場合は「なし」と入力してください。',
+    askItem: '【{0}】の品目を何と変更しますか？入力してください。\n\nそのままにするなら「スキップ」、変更をやめるなら「キャンセル」を押してください。',
+    askNote: '注意事項を何と変更しますか？入力してください。\n\nそのままにするなら「スキップ」、これまでの変更を取り消すなら「キャンセル」を押してください。',
     success: '✅【{0}】の予定を更新しました。\n\n品目: {1}\n注意事項: {2}',
     itemTooLong: '⚠️ 品名は20文字以内で入力してください。',
     noteTooLong: '⚠️ 注意事項は100文字以内で入力してください。',
@@ -61,7 +61,7 @@ const MESSAGES = {
   flex: {
     helpAltText: '使い方ガイド',
     scheduleAltText: 'ゴミ出しスケジュール一覧',
-    schedulePrompt: '変更したい曜日があれば、カードをタップして編集できます✨'
+    schedulePrompt: '変更したい曜日があれば、カードをタップして編集できます。',
   },
 };
 
@@ -86,9 +86,9 @@ function getFallbackMessage() {
     'text': 'ご用件が分かりませんでした。\n下のボタンから操作を選ぶか、メッセージを送信してください。',
     'quickReply': {
       'items': [
-        { 'type': 'action', 'action': { 'type': 'message', 'label': '今日のゴミ', 'text': '今日' } },
-        { 'type': 'action', 'action': { 'type': 'message', 'label': '明日のごみ', 'text': '明日' } },
-        { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧表示', 'text': '一覧' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧', 'text': '一覧' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '今日', 'text': '今日' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '明日', 'text': '明日' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': '使い方', 'text': '使い方' } },
       ]
     }
@@ -138,7 +138,6 @@ function getModificationNotePromptMessage(currentNote) {
     'quickReply': {
       'items': [
         { 'type': 'action', 'action': { 'type': 'message', 'label': 'スキップ', 'text': 'スキップ' } },
-        { 'type': 'action', 'action': { 'type': 'message', 'label': '注意事項なし', 'text': 'なし' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': 'キャンセル', 'text': 'キャンセル' } }
       ]
     }
