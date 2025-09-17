@@ -211,7 +211,7 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "● 「全部」「全部 詳細」",
+            "text": "● 「一覧」「一覧 詳細」",
             "weight": "bold",
             "size": "md",
             "wrap": true

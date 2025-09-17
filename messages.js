@@ -25,7 +25,7 @@ const MESSAGES = {
   // 登録
   registration: {
     // ★ 変更: 登録後の案内メッセージを新しいフローに合わせる
-    success: '✅ 登録が完了しました！\n\n「全部」と送信して、曜日ごとのごみ出し予定を確認・変更してみましょう。\n\n使い方が分からない時は「ヘルプ」と送信してください。',
+    success: '✅ 登録が完了しました！\n\n「一覧」と送信して、曜日ごとのごみ出し予定を確認・変更してみましょう。\n\n使い方が分からない時は「ヘルプ」と送信してください。',
     // [追加] 未登録ユーザーに登録を促すメッセージ
     prompt: 'ご利用には、まず「はじめる」を押して、ご利用を開始してください。',
   },
@@ -50,7 +50,7 @@ const MESSAGES = {
     dayResult: '{0}のゴミは【{1}】です。', // このメッセージは現在使われませんが、将来の拡張のために残しておいても良いでしょう
     notes: '\n📝 注意事項：{0}',
     notFound: '{0}のゴミ出し情報は見つかりませんでした。', // [変更]
-    sheetEmpty: 'ゴミ出し情報が登録されていません。「全部」と送信してスケジュールを登録してください。',
+    sheetEmpty: 'ゴミ出し情報が登録されていません。「一覧」と送信してスケジュールを登録してください。',
   },
   // エラー・状態
   error: {
@@ -87,7 +87,7 @@ function getFallbackMessage() {
       'items': [
         { 'type': 'action', 'action': { 'type': 'message', 'label': '今日のゴミ', 'text': '今日' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': '明日のごみ', 'text': '明日' } },
-        { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧表示', 'text': '全部' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧表示', 'text': '一覧' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': '使い方', 'text': '使い方' } },
       ]
     }

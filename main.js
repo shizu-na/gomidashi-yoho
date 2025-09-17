@@ -198,7 +198,7 @@ function createReplyMessage(event) {
     case 'ヘルプ':
       messageObject = getHelpFlexMessage();
       break;
-    case '全部':
+    case '一覧':
       messageObject = createScheduleFlexMessage(isDetailed, userId);
       break;
   }
