@@ -84,19 +84,31 @@ function parseQueryString_(query) {
 
 /**
  * ★ 修正: ポストバックイベントを専門に処理する関数
- * URLSearchParamsを使わない方法でデータを解析します。
+ * 連続タップ防止のロック処理を追加。
  * @param {object} event - LINEイベントオブジェクト
  */
 function handlePostback(event) {
-  const replyToken = event.replyToken;
   const userId = event.source.userId;
+  const cache = CacheService.getUserCache();
+  const lockKey = `lock_${userId}`; // ユーザーごとに一意なロックキーを定義
+  
+  // 1. まずロックがかかっているか確認
+  const isLocked = cache.get(lockKey);
+
+  // 2. もしロック中（isLockedがnullでない）なら、何もせず処理を終了
+  if (isLocked) {
+    return; // このreturnが重要！
+  }
+
+  // 3. ロックされていなければ、5秒間有効なロックをかける
+  // 第3引数の'5'がロック時間（秒）。Botの応答時間に合わせて調整してください。
+  cache.put(lockKey, 'true', 5);
+  const replyToken = event.replyToken;
   const postbackData = event.postback.data;
 
-  // ★ 変更: 新しいヘルパー関数でポストバックデータを解析
   const params = parseQueryString_(postbackData);
-  const action = params['action']; // オブジェクトのキーとして値を取得
+  const action = params['action'];
 
-  // actionが 'startChange' の場合、スケジュール変更フローを開始
   if (action === 'startChange') {
     const day = params['day'];
     startModificationFlow(replyToken, userId, day);
