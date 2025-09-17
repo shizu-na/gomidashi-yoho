@@ -19,7 +19,7 @@ function handleUnregistration(userId) {
 }
 
 /**
- * 「今日」「明日」のゴミ出し日問い合わせを処理します。
+ * 「今日」「明日」のごみ出し日問い合わせを処理します。
  * 問い合わせ結果には常にメモ（詳細）も表示します。
  * @param {string} command - ユーザーが入力したコマンド
  * @param {boolean} isDetailed - 詳細表示フラグ（現在は未使用だが将来の拡張用に残置）

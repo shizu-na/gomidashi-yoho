@@ -153,7 +153,7 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "🚮 今日のゴミを確認",
+            "text": "🚮 今日のごみを確認",
             "color": "#FFFFFF",
             "weight": "bold",
             "align": "center",
@@ -206,7 +206,7 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
-            "text": "🗑️ 明日のゴミを確認",
+            "text": "🗑️ 明日のごみを確認",
             "color": "#FFFFFF",
             "weight": "bold",
             "align": "center",

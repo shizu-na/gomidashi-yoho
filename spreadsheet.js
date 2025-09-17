@@ -114,9 +114,9 @@ function updateUserStatus(userId, status) {
 // =================================================================
 
 /**
- * 指定されたユーザーIDのゴミ出しスケジュールを全件取得します。
+ * 指定されたユーザーIDのごみ出しスケジュールを全件取得します。
  * @param {string} userId - データを取得するユーザーのID
- * @returns {Array<Array<string>>} ゴミ出しスケジュールのデータ配列
+ * @returns {Array<Array<string>>} ごみ出しスケジュールのデータ配列
  */
 function getSchedulesByUserId(userId) {
   try {
