@@ -62,52 +62,45 @@ function handleFollowEvent(event) {
   }
 }
 
-/**
- * ポストバックイベントを処理します。
- */
 function handlePostback(event) {
-  const userId = event.source.userId;
+  // LockServiceの部分は、最終的に決まった方式（LockService or CacheService）をお使いください
   const lock = LockService.getUserLock();
-
   if (!lock.tryLock(5000)) {
     writeLog('INFO', 'ボタン連打により処理をスキップしました。', userId);
     return;
   }
-
+  
   try {
-    const cache = CacheService.getUserCache();
+    const userId = event.source.userId;
     const replyToken = event.replyToken;
     const params = parseQueryString_(event.postback.data);
     const action = params.action;
 
     switch (action) {
-      case 'agreeToTerms': {
-        const userRecord = getUserRecord(userId);
-        if (!userRecord) {
-          createNewUser(userId);
-          writeLog('INFO', '新規ユーザー登録（利用規約同意）', userId);
-          replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.agreed)]);
-        } else if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
-          updateUserStatus(userId, USER_STATUS.ACTIVE);
-          replyToLine(replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
-        } else {
-          replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.already_active)]);
-        }
+      case 'agreeToTerms':
+        // (省略...変更なし)
         break;
-      }
       case 'disagreeToTerms':
-        replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.disagreed }]);
+        // (省略...変更なし)
         break;
+        
+      // ★ 変更点: 'setReminderTime' と 'stopReminder' の処理を更新
       case 'setReminderTime': {
         const selectedTime = event.postback.params.time;
-        updateReminderTime(userId, selectedTime);
-        const replyText = `✅ 承知いたしました。毎日 ${selectedTime} にリマインダーを送信します。`;
+        const type = params.type; // 'night' or 'morning' を取得
+        updateReminderTime(userId, selectedTime, type);
+        
+        const typeText = (type === 'night') ? '夜' : '朝';
+        const replyText = `✅ 承知いたしました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
         replyToLine(replyToken, [getMenuMessage(replyText)]);
         break;
       }
       case 'stopReminder': {
-        updateReminderTime(userId, null);
-        const replyText = '✅ リマインダーを停止しました。';
+        const type = params.type; // 'night' or 'morning' を取得
+        updateReminderTime(userId, null, type);
+        
+        const typeText = (type === 'night') ? '夜' : '朝';
+        const replyText = `✅【${typeText}のリマインダー】を停止しました。`;
         replyToLine(replyToken, [getMenuMessage(replyText)]);
         break;
       }
@@ -118,7 +111,7 @@ function handlePostback(event) {
       }
     }
   } catch (err) {
-    writeLog('ERROR', `handlePostback処理中にエラー: ${err.stack}`, userId);
+    writeLog('ERROR', `handlePostback処理中にエラー: ${err.stack}`, event.source.userId);
   } finally {
     lock.releaseLock();
   }

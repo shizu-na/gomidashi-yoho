@@ -9,11 +9,12 @@ const SHEET_NAMES = {
 };
 
 const COLUMNS_USER = {
-  USER_ID: 0,
-  STATUS: 1,
-  CREATED_AT: 2,
-  UPDATED_AT: 3,
-  REMINDER_TIME: 4
+  USER_ID: 0,           // A列
+  STATUS: 1,            // B列
+  CREATED_AT: 2,        // C列
+  UPDATED_AT: 3,        // D列
+  REMINDER_TIME_NIGHT: 4, // E列 ★変更
+  REMINDER_TIME_MORNING: 5, // F列 ★追加
 };
 
 const COLUMNS_SCHEDULE = {

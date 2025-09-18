@@ -1,54 +1,79 @@
 /**
- * @fileoverview ユーザーからのコマンド実行を処理する関数群です。
+ * @fileoverview (commands.js)
  */
 
 function createReplyMessage(event) {
   const userMessage = event.message.text.trim();
   const userId = event.source.userId;
-  let messageObject = null;
+  
+  try {
+    let messageObject = null;
+    switch (userMessage) {
+      case '退会':
+        messageObject = handleUnregistration(userId);
+        break;
 
-  switch (userMessage) {
-    case '退会':
-      messageObject = handleUnregistration(userId);
-      break;
-    case 'リマインダー': {
-      if (!isUserOnAllowlist(userId)) {
-        return [{ type: 'text', text: '申し訳ありません。この機能は許可されたユーザーのみご利用いただけます。' }];
+      case 'リマインダー': {
+        if (!isUserOnAllowlist(userId)) {
+          return [{ type: 'text', text: '申し訳ありません。この機能は許可されたユーザーのみご利用いただけます。' }];
+        }
+        
+        const userRecord = getUserRecord(userId);
+        if (!userRecord) {
+          writeLog('ERROR', '「リマインダー」処理中にユーザーレコード取得失敗。', userId);
+          return [{ type: 'text', text: 'ユーザー情報が見つかりませんでした。'}];
+        }
+
+        const db = getDatabase_();
+        if (!db) return [{ type: 'text', text: MESSAGES.common.error }];
+
+        const sheet = db.getSheetByName(SHEET_NAMES.USERS);
+        if (!sheet) return [{ type: 'text', text: MESSAGES.common.error }];
+
+        const nightTime = sheet.getRange(userRecord.row, COLUMNS_USER.REMINDER_TIME_NIGHT + 1).getDisplayValue();
+        const morningTime = sheet.getRange(userRecord.row, COLUMNS_USER.REMINDER_TIME_MORNING + 1).getDisplayValue();
+        
+        const flexMessage = getReminderManagementFlexMessage(nightTime, morningTime);
+        
+        // ★★★★★ 最終デバッグ ★★★★★
+        // LINE APIに送信する直前のFlex MessageのJSONを、整形してログに出力する
+        Logger.log("--- 送信直前のFlex Message JSON ---");
+        Logger.log(JSON.stringify(flexMessage, null, 2));
+        Logger.log("--- JSONここまで ---");
+        // ★★★★★★★★★★★★★★★★★★★
+        
+        return [flexMessage];
       }
-      const userRecord = getUserRecord(userId);
-      if (!userRecord) {
-        writeLog('ERROR', 'AllowlistにはいるがUsersにいない不正な状態', userId);
-        return [{ type: 'text', text: 'エラーが発生しました。お手数ですが、一度LINEの友達登録を解除し、再度登録し直してください。'}];
+        
+      case '使い方':
+      case 'ヘルプ':
+        messageObject = getHelpFlexMessage();
+        break;
+        
+      case '一覧': {
+        const carouselMessage = createScheduleFlexMessage(userId);
+        if (carouselMessage && carouselMessage.type === 'flex') {
+          const promptMessage = { type: 'text', text: MESSAGES.flex.schedulePrompt };
+          return [carouselMessage, promptMessage];
+        }
+        messageObject = carouselMessage;
+        break;
       }
-      const db = getDatabase_();
-      if (!db) return [{ type: 'text', text: MESSAGES.common.error }];
-      const sheet = db.getSheetByName(SHEET_NAMES.USERS);
-      const currentTime = sheet.getRange(userRecord.row, COLUMNS_USER.REMINDER_TIME + 1).getDisplayValue();
-      return [getReminderManagementFlexMessage(currentTime)];
     }
-    case '使い方':
-    case 'ヘルプ':
-      messageObject = getHelpFlexMessage();
-      break;
-    case '一覧': {
-      const carouselMessage = createScheduleFlexMessage(userId);
-      if (carouselMessage && carouselMessage.type === 'flex') {
-        const promptMessage = { type: 'text', text: MESSAGES.flex.schedulePrompt };
-        return [carouselMessage, promptMessage];
-      }
-      messageObject = carouselMessage;
-      break;
+
+    if (!messageObject) {
+      messageObject = handleGarbageQuery(userMessage, userId);
     }
-  }
 
-  if (!messageObject) {
-    messageObject = handleGarbageQuery(userMessage, userId);
-  }
+    if (messageObject) {
+      return Array.isArray(messageObject) ? messageObject : [messageObject];
+    }
+    return null;
 
-  if (messageObject) {
-    return Array.isArray(messageObject) ? messageObject : [messageObject];
+  } catch (err) {
+    writeLog('CRITICAL', `createReplyMessageで予期せぬエラー: ${err.stack}`, userId);
+    return [{ type: 'text', text: '申し訳ありません、予期せぬエラーが発生しました。'}];
   }
-  return null;
 }
 
 function handleUnregistration(userId) {
@@ -69,40 +94,34 @@ function handleGarbageQuery(command, userId) {
   }
 
   let targetDay;
+  let title;
   const todayJST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
 
   if (command === '今日' || command === 'きょう') {
     const todayIndex = todayJST.getDay();
     targetDay = WEEKDAYS_FULL[(todayIndex + 6) % 7];
+    title = '今日のごみ🗑️';
   } else if (command === '明日' || command === 'あした') {
     const tomorrowJST = new Date(todayJST);
     tomorrowJST.setDate(tomorrowJST.getDate() + 1);
     const tomorrowIndex = tomorrowJST.getDay();
     targetDay = WEEKDAYS_FULL[(tomorrowIndex + 6) % 7];
+    title = '明日のごみ🗑️';
   }
 
   if (!targetDay) return null;
-
   const foundRow = data.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
-
   if (!foundRow) {
     return getMenuMessage(formatMessage(MESSAGES.query.notFound, command));
   }
 
-  let replyText;
-  const garbageType = foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE];
-  if (command === '今日' || command === 'きょう') {
-    replyText = formatMessage(MESSAGES.query.todayResult, garbageType);
-  } else {
-    replyText = formatMessage(MESSAGES.query.tomorrowResult, garbageType);
-  }
-
+  const item = foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE];
   const note = foundRow[COLUMNS_SCHEDULE.NOTES];
-  if (note && note !== '-') {
-    replyText += formatMessage(MESSAGES.query.notes, note);
-  }
+  const altText = `${targetDay}のごみは「${item}」です。`;
 
-  return getMenuMessage(replyText);
+  // 最後の引数に true を追加して、クイックメッセージ付きのFlex Messageを生成
+  const flexMessage = createSingleDayFlexMessage(title, targetDay, item, note, altText, true);
+  return [flexMessage];
 }
 
 function startModificationFlow(replyToken, userId, dayToModify) {
@@ -179,107 +198,90 @@ function handleNoteInput_(replyToken, userId, newNote, state, cache) {
 
   const sanitizedItem = sanitizeInput_(finalItem);
   const sanitizedNote = sanitizeInput_(finalNote);
-
   const success = updateSchedule(userId, state.day, sanitizedItem, sanitizedNote);
   cache.remove(userId);
 
   if (success) {
-    const messageText = formatMessage(MESSAGES.modification.success, state.day, finalItem, finalNote);
-    replyToLine(replyToken, [getMenuMessage(messageText)]);
+    const title = '✅ 予定を更新しました';
+    const altText = `【${state.day}】の予定を「${finalItem}」に更新しました。`;
+    // 最後の引数に true を追加して、クイックメッセージ付きのFlex Messageを生成
+    const flexMessage = createSingleDayFlexMessage(title, state.day, finalItem, finalNote, altText, true);
+    // 送信メッセージを1通にまとめる
+    replyToLine(replyToken, [flexMessage]);
   } else {
     replyToLine(replyToken, [getMenuMessage(MESSAGES.error.updateFailed)]);
   }
 }
 
 /**
- * 登録されている全ユーザーをチェックし、設定時刻になったユーザーにリマインダーを送信します。
- * この関数をGASのトリガーで5分おきなどの短い間隔で実行します。
+ * @fileoverview (commands.js)
  */
 function sendReminders() {
   try {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-    Logger.log(`リマインダーチェック開始: ${now.toLocaleString('ja-JP')}`);
-
     const db = getDatabase_();
     if (!db) return;
     const usersSheet = db.getSheetByName(SHEET_NAMES.USERS);
-    if (!usersSheet || usersSheet.getLastRow() < 2) {
-      Logger.log('リマインダー対象ユーザーがいません。');
-      return;
-    }
+    if (!usersSheet || usersSheet.getLastRow() < 2) return;
 
     const allUsersData = usersSheet.getRange(2, 1, usersSheet.getLastRow() - 1, usersSheet.getLastColumn()).getDisplayValues();
-
-    // ★★★ 超詳細デバッグログここから ★★★
-    Logger.log(`--- Usersシート生データチェック (全${allUsersData.length}件) ---`);
-    allUsersData.forEach((userRow, index) => {
-      const status = userRow[COLUMNS_USER.STATUS];
-      const reminderTime = userRow[COLUMNS_USER.REMINDER_TIME];
-      Logger.log(
-        `[${index + 1}] ` +
-        `Status: "${status}" (type: ${typeof status}), ` +
-        `Time: "${reminderTime}" (type: ${typeof reminderTime}, length: ${String(reminderTime).length})`
-      );
-    });
-    Logger.log(`--- 生データチェック終了 ---`);
-    // ★★★ 超詳細デバッグログここまで ★★★
-
-    const usersToRemind = allUsersData.filter(userRow => {
-      const userId = userRow[COLUMNS_USER.USER_ID];
-      const status = userRow[COLUMNS_USER.STATUS];
-      const reminderTime = userRow[COLUMNS_USER.REMINDER_TIME];
-
-      if (status !== USER_STATUS.ACTIVE || typeof reminderTime !== 'string' || !/^\d{2}:\d{2}$/.test(reminderTime)) {
-        return false;
-      }
-      
-      const [hour, minute] = reminderTime.split(':');
-      const reminderDate = new Date(now);
-      reminderDate.setHours(parseInt(hour, 10), parseInt(minute, 10), 0, 0);
-      const timeDiff = now.getTime() - reminderDate.getTime();
-      const isTime = timeDiff >= 0 && timeDiff < TRIGGER_INTERVAL_MINUTES * 60 * 1000;
-      
-      Logger.log(`判定 -> ID: ${userId}, Status: "${status}", Time: "${reminderTime}", isTime: ${isTime}`);
-      return isTime;
-    });
-
-    Logger.log(`リマインド対象者: ${usersToRemind.length}名`);
-
-    if (usersToRemind.length === 0) return;
-
-    // ... (以降の処理は変更ありません)
     const schedulesSheet = db.getSheetByName(SHEET_NAMES.SCHEDULES);
-    const allSchedules = schedulesSheet.getLastRow() > 1 
+    const allSchedules = schedulesSheet.getLastRow() > 1
       ? schedulesSheet.getRange(2, 1, schedulesSheet.getLastRow() - 1, schedulesSheet.getLastColumn()).getValues()
       : [];
 
-    usersToRemind.forEach(userRow => {
+    allUsersData.forEach(userRow => {
       const userId = userRow[COLUMNS_USER.USER_ID];
-      const tomorrow = new Date(now);
-      tomorrow.setDate(now.getDate() + 1);
-      const tomorrowDayIndex = (tomorrow.getDay() + 6) % 7;
-      const targetDay = WEEKDAYS_FULL[tomorrowDayIndex];
+      if (userRow[COLUMNS_USER.STATUS] !== USER_STATUS.ACTIVE) return;
 
       const userSchedules = allSchedules.filter(row => row[COLUMNS_SCHEDULE.USER_ID] === userId);
-      const tomorrowSchedule = userSchedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
 
-      let messageText = '';
-      if (tomorrowSchedule) {
-        const item = tomorrowSchedule[COLUMNS_SCHEDULE.GARBAGE_TYPE];
-        const note = tomorrowSchedule[COLUMNS_SCHEDULE.NOTES];
-        messageText = `【リマインダー🔔】\n明日のごみは「${item}」です。`;
-        if (note && note !== '-') {
-          messageText += `\n\n📝 メモ:\n${note}`;
+      // --- ① 夜のリマインダー（前日通知）をチェック ---
+      const reminderTimeNight = userRow[COLUMNS_USER.REMINDER_TIME_NIGHT];
+      if (isTimeToSend(now, reminderTimeNight)) {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(now.getDate() + 1);
+        const targetDay = WEEKDAYS_FULL[(tomorrow.getDay() + 6) % 7];
+        const schedule = userSchedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
+        
+        if (schedule) {
+          const item = schedule[COLUMNS_SCHEDULE.GARBAGE_TYPE];
+          const note = schedule[COLUMNS_SCHEDULE.NOTES];
+          const flexMessage = createSingleDayFlexMessage('リマインダー🔔 (夜)', `明日のごみ (${targetDay})`, item, note, `【リマインダー】明日のごみは「${item}」です。`, true);
+          pushToLine(userId, [flexMessage]);
+          Logger.log(`夜リマインダー送信 to ${userId}`);
         }
-      } else {
-        messageText = `【リマインダー🔔】\n明日のごみ出し予定は登録されていません。`;
       }
       
-      Logger.log(`メッセージ送信 to ${userId}: ${messageText.replace(/\n/g, ' ')}`);
-      pushToLine(userId, [{ type: 'text', text: messageText }]);
+      // --- ② 朝のリマインダー（当日通知）をチェック ---
+      const reminderTimeMorning = userRow[COLUMNS_USER.REMINDER_TIME_MORNING];
+      if (isTimeToSend(now, reminderTimeMorning)) {
+        const targetDay = WEEKDAYS_FULL[(now.getDay() + 6) % 7];
+        const schedule = userSchedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
+        
+        if (schedule) {
+          const item = schedule[COLUMNS_SCHEDULE.GARBAGE_TYPE];
+          const note = schedule[COLUMNS_SCHEDULE.NOTES];
+          const flexMessage = createSingleDayFlexMessage('リマインダー☀️ (朝)', `今日のごみ (${targetDay})`, item, note, `【リマインダー】今日のごみは「${item}」です。`, true);
+          pushToLine(userId, [flexMessage]);
+          Logger.log(`朝リマインダー送信 to ${userId}`);
+        }
+      }
     });
   } catch (err) {
     writeLog('CRITICAL', `sendRemindersでエラーが発生: ${err.stack}`, 'SYSTEM');
     Logger.log(`sendRemindersでエラーが発生: ${err.stack}`);
   }
+}
+
+// ★ 追加: 時刻が通知タイミングかどうかを判定するヘルパー関数
+function isTimeToSend(now, timeString) {
+  if (typeof timeString !== 'string' || !/^\d{2}:\d{2}$/.test(timeString)) {
+    return false;
+  }
+  const [hour, minute] = timeString.split(':');
+  const targetDate = new Date(now);
+  targetDate.setHours(parseInt(hour, 10), parseInt(minute, 10), 0, 0);
+  const timeDiff = now.getTime() - targetDate.getTime();
+  return timeDiff >= 0 && timeDiff < TRIGGER_INTERVAL_MINUTES * 60 * 1000;
 }

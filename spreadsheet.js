@@ -151,14 +151,26 @@ function isUserOnAllowlist(userId) {
   }
 }
 
-function updateReminderTime(userId, time) {
+// ★ 変更点: 引数に type ('night' or 'morning') を追加
+function updateReminderTime(userId, time, type) {
   try {
     const userRecord = getUserRecord(userId);
     if (!userRecord) return false;
     const db = getDatabase_();
     if (!db) return false;
     const sheet = db.getSheetByName(SHEET_NAMES.USERS);
-    sheet.getRange(userRecord.row, COLUMNS_USER.REMINDER_TIME + 1).setValue(time || '');
+
+    // ★ 変更点: typeに応じて更新する列を決定
+    let targetColumn;
+    if (type === 'night') {
+      targetColumn = COLUMNS_USER.REMINDER_TIME_NIGHT + 1;
+    } else if (type === 'morning') {
+      targetColumn = COLUMNS_USER.REMINDER_TIME_MORNING + 1;
+    } else {
+      return false; // 不正なtypeの場合は何もしない
+    }
+    
+    sheet.getRange(userRecord.row, targetColumn).setValue(time || '');
     return true;
   } catch (e) {
     writeLog('ERROR', `リマインダー時刻の更新でエラー: ${e.message}`, userId);
