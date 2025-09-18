@@ -2,9 +2,12 @@
  * @fileoverview LINEからのWebhookリクエストを処理し、各機能へ振り分けるメインスクリプトです。
  */
 
+// スクリプトプロパティから取得する値は、一度定数に格納してから利用します。
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 const SECRET_TOKEN = PropertiesService.getScriptProperties().getProperty('SECRET_TOKEN');
-const TERMS_URL = 'https://shizu-na.github.io/gomidashi-yoho/policy'; // ★ あなたのリポジトリのURLに書き換えてください
+const DATABASE_SHEET_ID = PropertiesService.getScriptProperties().getProperty('DATABASE_SHEET_ID');
+const LOG_ID = PropertiesService.getScriptProperties().getProperty('LOG_ID');
+const TERMS_URL = 'https://shizu-na.github.io/gomidashi-yoho/policy'; // ★ ご自身のGitHub Pages等のURLに設定してください
 
 /**
  * LINEからのWebhookリクエストを処理するメイン関数
@@ -14,22 +17,26 @@ function doPost(e) {
   // Webhook URLに含まれるトークンを検証
   const receivedToken = e.parameter.token;
   if (receivedToken !== SECRET_TOKEN) {
-    console.log("不正なリクエストです。");
+    console.error("不正なリクエストです: トークンが一致しません。");
     return;
   }
 
-  const event = JSON.parse(e.postData.contents).events[0];
+  try {
+    const event = JSON.parse(e.postData.contents).events[0];
 
-  switch (event.type) {
-    case 'message':
-      handleMessage(event);
-      break;
-    case 'follow':
-      handleFollowEvent(event);
-      break;
-    case 'postback':
-      handlePostback(event);
-      break;
+    switch (event.type) {
+      case 'message':
+        handleMessage(event);
+        break;
+      case 'follow':
+        handleFollowEvent(event);
+        break;
+      case 'postback':
+        handlePostback(event);
+        break;
+    }
+  } catch (err) {
+    writeLog('CRITICAL', `doPostで致命的なエラーが発生: ${err.stack}`, '');
   }
 }
 
@@ -42,7 +49,6 @@ function handleFollowEvent(event) {
   const userRecord = getUserRecord(userId);
 
   if (!userRecord) {
-    // ★ 変更: 「挨拶」「Bot紹介」「同意確認」の3メッセージを送る
     const messages = [
       { type: 'text', text: MESSAGES.event.follow_new },
       { type: 'text', text: MESSAGES.event.bot_description },
@@ -57,50 +63,24 @@ function handleFollowEvent(event) {
 }
 
 /**
- * ポストバックデータを解析するためのヘルパー関数です。
- * @param {string} query - "key=value&key2=value2" 形式の文字列
- * @returns {object} 解析後のオブジェクト { key: value, key2: value2 }
- */
-function parseQueryString_(query) {
-  const params = {};
-  if (!query) {
-    return params;
-  }
-  query.split('&').forEach(pair => {
-    const parts = pair.split('=');
-    if (parts.length === 2) {
-      const key = decodeURIComponent(parts[0]);
-      const value = decodeURIComponent(parts[1]);
-      params[key] = value;
-    }
-  });
-  return params;
-}
-
-/**
  * ポストバックイベントを処理します。
- * LockServiceを使用して、処理の重複実行（競合状態）を確実に防ぎます。
  */
 function handlePostback(event) {
   const userId = event.source.userId;
-  // ユーザーごとに独立したロックを取得
   const lock = LockService.getUserLock();
 
-  // 100ミリ秒だけロックの取得を試みる
-  if (!lock.tryLock(100)) {
-    // ロックが取得できなかった場合（他の処理が実行中）、何もせずに終了
+  if (!lock.tryLock(5000)) {
+    writeLog('INFO', 'ボタン連打により処理をスキップしました。', userId);
     return;
   }
 
   try {
-    // --- ここから下がメインの処理 ---
-
     const cache = CacheService.getUserCache();
     const replyToken = event.replyToken;
     const params = parseQueryString_(event.postback.data);
     const action = params.action;
 
-    switch(action) {
+    switch (action) {
       case 'agreeToTerms': {
         const userRecord = getUserRecord(userId);
         if (!userRecord) {
@@ -115,13 +95,10 @@ function handlePostback(event) {
         }
         break;
       }
-
       case 'disagreeToTerms':
         replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.disagreed }]);
         break;
-
       case 'setReminderTime': {
-        // タイムピッカーからの応答を処理
         const selectedTime = event.postback.params.time;
         updateReminderTime(userId, selectedTime);
         const replyText = `✅ 承知いたしました。毎日 ${selectedTime} にリマインダーを送信します。`;
@@ -134,20 +111,15 @@ function handlePostback(event) {
         replyToLine(replyToken, [getMenuMessage(replyText)]);
         break;
       }
-
       case 'startChange': {
-        const currentState = cache.get(userId);
-        if (currentState) {
-          return;
-        }
         const day = params.day;
         startModificationFlow(replyToken, userId, day);
         break;
       }
     }
-
+  } catch (err) {
+    writeLog('ERROR', `handlePostback処理中にエラー: ${err.stack}`, userId);
   } finally {
-    // 処理が成功してもエラーで終了しても、必ずロックを解放する
     lock.releaseLock();
   }
 }
@@ -156,110 +128,73 @@ function handlePostback(event) {
  * 全てのメッセージイベントを処理する司令塔です。
  */
 function handleMessage(event) {
-  if (event.message.type !== 'text') {
-    return;
-  }
-  const replyToken = event.replyToken;
   const userId = event.source.userId;
-  const userMessage = event.message.text.trim();
+  Logger.log(`[${userId}] handleMessage 実行開始`);
 
-  // 対話フローの処理を最優先でチェック
-  const cache = CacheService.getUserCache();
-  const cachedState = cache.get(userId);
-  if (cachedState) {
-    continueModification(replyToken, userId, userMessage, cachedState);
+  const lock = LockService.getUserLock();
+  if (!lock.tryLock(5000)) {
+    writeLog('INFO', 'メッセージ連打により処理をスキップしました。', userId);
+    Logger.log(`[${userId}] ロック取得失敗、処理スキップ`);
     return;
   }
+  
+  Logger.log(`[${userId}] ロック取得成功`);
 
-  const userRecord = getUserRecord(userId);
-
-  // ★ 変更: 未登録ユーザーのハンドリングをシンプル化
-  if (!userRecord) {
-    // 未登録のユーザーからのメッセージには、常に同意確認を返す
-    replyToLine(replyToken, [getTermsAgreementFlexMessage(TERMS_URL)]);
-    return;
-  }
-
-  // 退会済みユーザーのハンドリング
-  if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
-    if (userMessage === '利用を再開する') {
-      updateUserStatus(userId, USER_STATUS.ACTIVE);
-      // ★ 変更: 行き止まり解消のためメニューを追加
-      replyToLine(replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
-    } else {
-      replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.unregistration.unsubscribed)]);
+  try {
+    if (event.message.type !== 'text') {
+      return;
     }
-    return;
-  }
+    const replyToken = event.replyToken;
+    const userMessage = event.message.text.trim();
 
-  // アクティブユーザーのコマンド処理
-  const replyMessages = createReplyMessage(event);
-  if (replyMessages) {
-    replyToLine(replyToken, replyMessages);
-  } else {
-    replyToLine(replyToken, [getFallbackMessage()]);
+    const cache = CacheService.getUserCache();
+    const cachedState = cache.get(userId);
+    if (cachedState) {
+      continueModification(replyToken, userId, userMessage, cachedState);
+      return;
+    }
+
+    const userRecord = getUserRecord(userId);
+    if (!userRecord) {
+      replyToLine(replyToken, [getTermsAgreementFlexMessage(TERMS_URL)]);
+      return;
+    }
+
+    if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
+      if (userMessage === '利用を再開する') {
+        updateUserStatus(userId, USER_STATUS.ACTIVE);
+        replyToLine(replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
+      } else {
+        replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.unregistration.unsubscribed)]);
+      }
+      return;
+    }
+
+    const replyMessages = createReplyMessage(event);
+    if (replyMessages && replyMessages.length > 0) {
+      replyToLine(replyToken, replyMessages);
+    } else {
+      replyToLine(replyToken, [getFallbackMessage()]);
+    }
+  } catch (err) {
+    writeLog('ERROR', `handleMessage処理中にエラー: ${err.stack}`, userId);
+  } finally {
+    lock.releaseLock();
+    Logger.log(`[${userId}] ロック解放`);
   }
 }
 
-
 /**
- * ユーザーメッセージを解析し、適切なコマンド処理を呼び出します。
- * @param {object} event - LINEイベントオブジェクト
- * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
+ * ポストバックデータを解析するためのヘルパー関数です。
  */
-function createReplyMessage(event) {
-  const userMessage = event.message.text.trim();
-  const userId = event.source.userId;
-  const command = userMessage;
-
-  let messageObject = null;
-
-  switch (command) {
-    case '退会':
-      messageObject = handleUnregistration(userId);
-      break;
-    case 'リマインダー': {
-      if (!isUserOnAllowlist(userId)) {
-        return [{ type: 'text', text: '申し訳ありません。リマインダー機能は、許可されたユーザーのみご利用いただけます。' }];
-      } else {
-        const userRecord = getUserRecord(userId);
-        if (!userRecord) {
-          // このエラーは通常発生しないはずだが、念のため
-          writeLog('ERROR', 'AllowlistにはいるがUsersにいない不正な状態', userId);
-          return [{ type: 'text', text: 'エラーが発生しました。お手数ですが、一度LINEの友達登録を解除し、再度登録し直してください。'}];
-        }
-        const sheet = getDatabase_().getSheetByName('Users');
-        const currentTime = sheet.getRange(userRecord.row, 5).getValue();
-        return [getReminderManagementFlexMessage(currentTime)];
-      }
+function parseQueryString_(query) {
+  const params = {};
+  if (!query) return params;
+  query.split('&').forEach(pair => {
+    const parts = pair.split('=').map(decodeURIComponent);
+    if (parts.length === 2) {
+      params[parts[0]] = parts[1];
     }
-    case '使い方':
-    case 'ヘルプ':
-      messageObject = getHelpFlexMessage();
-      break;
-    case '一覧': {
-      const carouselMessage = createScheduleFlexMessage(userId);
-      
-      if (carouselMessage && carouselMessage.type === 'flex') {
-        const promptMessage = {
-          type: 'text',
-          text: MESSAGES.flex.schedulePrompt
-        };
-        return [carouselMessage, promptMessage];
-      }
-      
-      messageObject = carouselMessage;
-      break;
-    }
-  }
-
-  if (!messageObject) {
-    messageObject = handleGarbageQuery(command, false, userId);
-  }
-
-  if (messageObject) {
-    return Array.isArray(messageObject) ? messageObject : [messageObject];
-  }
-
-  return null;
+  });
+  return params;
 }

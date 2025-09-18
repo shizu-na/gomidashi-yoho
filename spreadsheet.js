@@ -2,17 +2,7 @@
  * @fileoverview Googleスプレッドシートの操作に関連する関数群です。
  */
 
-// =================================================================
-// データベース操作コア
-// =================================================================
-
-/**
- * データベースのスプレッドシートオブジェクトを取得します。（プライベート関数）
- * @private
- * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet|null}
- */
 function getDatabase_() {
-  const DATABASE_SHEET_ID = PropertiesService.getScriptProperties().getProperty('DATABASE_SHEET_ID');
   if (!DATABASE_SHEET_ID) {
     console.error('GASのスクリプトプロパティに「DATABASE_SHEET_ID」が設定されていません。');
     return null;
@@ -20,87 +10,66 @@ function getDatabase_() {
   try {
     return SpreadsheetApp.openById(DATABASE_SHEET_ID);
   } catch (e) {
-    console.error(`データベース（ID: ${DATABASE_SHEET_ID}）が開けませんでした。`);
+    writeLog('CRITICAL', `データベース（ID: ${DATABASE_SHEET_ID}）が開けませんでした。`, 'SYSTEM');
     return null;
   }
 }
 
-// =================================================================
-// Usersシート関連
-// =================================================================
-
-/**
- * Usersシートから指定されたuserIdのレコードを高速に検索します。
- * @param {string} userId - 検索するユーザーID
- * @returns {{row: number, status: string}|null} 見つかった行番号とステータス、なければnull
- */
 function getUserRecord(userId) {
   try {
     const db = getDatabase_();
     if (!db) return null;
-    const sheet = db.getSheetByName('Users');
+    const sheet = db.getSheetByName(SHEET_NAMES.USERS);
     if (!sheet) return null;
-
-    // TextFinderを使用してA列（userId列）を高速に検索
-    const range = sheet.getRange("A:A")
-    .createTextFinder(userId.toString()) // 文字列に変換
-    .matchEntireCell(true) // 完全一致のみを対象
-    .findNext();
-
+    const range = sheet.getRange("A:A").createTextFinder(userId).matchEntireCell(true).findNext();
     if (range) {
       const rowNum = range.getRow();
-      const status = sheet.getRange(rowNum, COLUMNS_USER.STATUS + 1).getValue();
-      return { row: rowNum, status: status };
+      const rowData = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn()).getValues()[0];
+      return { 
+        row: rowNum, 
+        status: rowData[COLUMNS_USER.STATUS]
+      };
     }
-
-    return null; // 見つからなかった場合
+    return null;
   } catch (e) {
     writeLog('ERROR', `ユーザーレコード検索でエラー: ${e.message}`, userId);
     return null;
   }
 }
 
-
-/**
- * 新規ユーザーをUsersシートとSchedulesシートに作成します。
- * @param {string} userId - 作成するユーザーID
- */
 function createNewUser(userId) {
   try {
     const db = getDatabase_();
     if (!db) return;
-    const usersSheet = db.getSheetByName('Users');
-    const schedulesSheet = db.getSheetByName('Schedules');
+    const usersSheet = db.getSheetByName(SHEET_NAMES.USERS);
+    const schedulesSheet = db.getSheetByName(SHEET_NAMES.SCHEDULES);
     const now = new Date();
 
-    usersSheet.appendRow([userId, USER_STATUS.ACTIVE, now, now]);
+    const newUserRow = [];
+    newUserRow[COLUMNS_USER.USER_ID] = userId;
+    newUserRow[COLUMNS_USER.STATUS] = USER_STATUS.ACTIVE;
+    newUserRow[COLUMNS_USER.CREATED_AT] = now;
+    newUserRow[COLUMNS_USER.UPDATED_AT] = now;
+    newUserRow[COLUMNS_USER.REMINDER_TIME] = '';
+    usersSheet.appendRow(newUserRow);
 
     const initialSchedules = WEEKDAYS_FULL.map(day => {
-      if (day === '日曜日') {
-        return [userId, day, '（回収なし）', '-'];
-      }
-      return [userId, day, '（未設定）', '-'];
+      const item = (day === '日曜日') ? '（回収なし）' : '（未設定）';
+      return [userId, day, item, '-'];
     });
     schedulesSheet.getRange(schedulesSheet.getLastRow() + 1, 1, 7, 4).setValues(initialSchedules);
-
   } catch (e) {
     writeLog('ERROR', `新規ユーザー作成でエラー: ${e.message}`, userId);
   }
 }
 
-/**
- * ユーザーのステータスを更新します。
- * @param {string} userId - 更新対象のユーザーID
- * @param {string} status - 新しいステータス
- */
 function updateUserStatus(userId, status) {
   try {
     const userRecord = getUserRecord(userId);
     if (!userRecord) return;
-
     const db = getDatabase_();
     if (!db) return;
-    const sheet = db.getSheetByName('Users');
+    const sheet = db.getSheetByName(SHEET_NAMES.USERS);
     sheet.getRange(userRecord.row, COLUMNS_USER.STATUS + 1).setValue(status);
     sheet.getRange(userRecord.row, COLUMNS_USER.UPDATED_AT + 1).setValue(new Date());
     writeLog('INFO', `ユーザーステータス更新: ${status}`, userId);
@@ -109,24 +78,13 @@ function updateUserStatus(userId, status) {
   }
 }
 
-// =================================================================
-// Schedulesシート関連
-// =================================================================
-
-/**
- * 指定されたユーザーIDのごみ出しスケジュールを全件取得します。
- * @param {string} userId - データを取得するユーザーのID
- * @returns {Array<Array<string>>} ごみ出しスケジュールのデータ配列
- */
 function getSchedulesByUserId(userId) {
   try {
     const db = getDatabase_();
     if (!db) return [];
-    const sheet = db.getSheetByName('Schedules');
+    const sheet = db.getSheetByName(SHEET_NAMES.SCHEDULES);
     if (!sheet || sheet.getLastRow() < 2) return [];
-
     const allData = sheet.getDataRange().getValues();
-    // ヘッダー行を除き、userIdでフィルタリング
     return allData.slice(1).filter(row => row[COLUMNS_SCHEDULE.USER_ID] === userId);
   } catch (e) {
     writeLog('ERROR', `スケジュール取得でエラー: ${e.message}`, userId);
@@ -134,22 +92,12 @@ function getSchedulesByUserId(userId) {
   }
 }
 
-/**
- * 指定ユーザーの特定曜日のスケジュールを更新します。
- * @param {string} userId - 更新対象のユーザーID
- * @param {string} day - 更新対象の曜日 (例: '月曜日')
- * @param {string} item - 新しい品目
- * @param {string} note - 新しいメモ
- * @returns {boolean} 成功すればtrue、失敗すればfalse
- */
 function updateSchedule(userId, day, item, note) {
   try {
     const db = getDatabase_();
     if (!db) return false;
-    const sheet = db.getSheetByName('Schedules');
+    const sheet = db.getSheetByName(SHEET_NAMES.SCHEDULES);
     const allData = sheet.getDataRange().getValues();
-
-    // userIdと曜日が一致する行を探す
     for (let i = 1; i < allData.length; i++) {
       if (allData[i][COLUMNS_SCHEDULE.USER_ID] === userId && allData[i][COLUMNS_SCHEDULE.DAY_OF_WEEK] === day) {
         const rowNum = i + 1;
@@ -157,36 +105,20 @@ function updateSchedule(userId, day, item, note) {
         return true;
       }
     }
-    return false; // 該当データが見つからなかった
+    return false;
   } catch (e) {
     writeLog('ERROR', `スケジュール更新処理でエラー: ${e.message}`, userId);
     return false;
   }
 }
 
-
-// =================================================================
-// ログ関連
-// =================================================================
-
-/**
- * ログシートにメッセージを記録します。
- * @param {string} level - ログレベル ('INFO', 'ERROR')
- * @param {string} message - 記録するメッセージ
- * @param {string} [ownerId=''] - 関連するユーザーIDなど（任意）
- */
 function writeLog(level, message, ownerId = '') {
   try {
-    const LOG_ID = PropertiesService.getScriptProperties().getProperty('LOG_ID');
-    if (!LOG_ID) {
-      console.error('GASのスクリプトプロパティに「LOG_ID」が設定されていません。');
-      return;
-    }
+    if (!LOG_ID) return;
     const spreadsheet = SpreadsheetApp.openById(LOG_ID);
     const now = new Date();
     const sheetName = `Log_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     let sheet = spreadsheet.getSheetByName(sheetName);
-
     if (!sheet) {
       sheet = spreadsheet.insertSheet(sheetName, 0);
       sheet.appendRow(['タイムスタンプ', 'ログレベル', 'メッセージ', 'Owner ID']);
@@ -197,33 +129,19 @@ function writeLog(level, message, ownerId = '') {
   }
 }
 
-/**
- * スプレッドシートの数式インジェクションを防ぐために入力値をサニタイズ（無害化）します。
- * @private
- * @param {string} input - ユーザーからの入力文字列
- * @returns {string} サニタイズ後の文字列
- */
 function sanitizeInput_(input) {
-  if (typeof input !== 'string') {
-    return input;
-  }
-  // =, +, -, @ で始まる場合は、先頭にシングルクォートを追加して数式化を防ぐ
+  if (typeof input !== 'string') return input;
   if (['=', '+', '-', '@'].includes(input.charAt(0))) {
     return "'" + input;
   }
   return input;
 }
 
-/**
- * 指定されたuserIdがAllowlistシートに存在するかを確認します。
- * @param {string} userId - 確認対象のユーザーID
- * @returns {boolean} 許可リストに存在すればtrue、しなければfalse
- */
 function isUserOnAllowlist(userId) {
   try {
     const db = getDatabase_();
     if (!db) return false;
-    const sheet = db.getSheetByName('Allowlist');
+    const sheet = db.getSheetByName(SHEET_NAMES.ALLOWLIST);
     if (!sheet) return false;
     const range = sheet.getRange("A:A").createTextFinder(userId).findNext();
     return range !== null;
@@ -233,22 +151,14 @@ function isUserOnAllowlist(userId) {
   }
 }
 
-/**
- * 指定されたユーザーのリマインダー時刻を更新します。
- * @param {string} userId - 更新対象のユーザーID
- * @param {string|null} time - 設定する時刻（例: "21:00"）。停止する場合はnullを渡す。
- * @returns {boolean} 更新に成功すればtrue
- */
 function updateReminderTime(userId, time) {
   try {
     const userRecord = getUserRecord(userId);
     if (!userRecord) return false;
-
     const db = getDatabase_();
     if (!db) return false;
-    const sheet = db.getSheetByName('Users');
-    // E列（reminderTime）の値を更新。timeがnullなら空文字を入れる
-    sheet.getRange(userRecord.row, 5).setValue(time || '');
+    const sheet = db.getSheetByName(SHEET_NAMES.USERS);
+    sheet.getRange(userRecord.row, COLUMNS_USER.REMINDER_TIME + 1).setValue(time || '');
     return true;
   } catch (e) {
     writeLog('ERROR', `リマインダー時刻の更新でエラー: ${e.message}`, userId);
