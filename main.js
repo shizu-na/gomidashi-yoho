@@ -120,6 +120,21 @@ function handlePostback(event) {
         replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.disagreed }]);
         break;
 
+      case 'setReminderTime': {
+        // タイムピッカーからの応答を処理
+        const selectedTime = event.postback.params.time;
+        updateReminderTime(userId, selectedTime);
+        const replyText = `✅ 承知いたしました。毎日 ${selectedTime} にリマインダーを送信します。`;
+        replyToLine(replyToken, [getMenuMessage(replyText)]);
+        break;
+      }
+      case 'stopReminder': {
+        updateReminderTime(userId, null);
+        const replyText = '✅ リマインダーを停止しました。';
+        replyToLine(replyToken, [getMenuMessage(replyText)]);
+        break;
+      }
+
       case 'startChange': {
         const currentState = cache.get(userId);
         if (currentState) {
@@ -203,12 +218,26 @@ function createReplyMessage(event) {
     case '退会':
       messageObject = handleUnregistration(userId);
       break;
+    case 'リマインダー': {
+      if (!isUserOnAllowlist(userId)) {
+        return [{ type: 'text', text: '申し訳ありません。リマインダー機能は、許可されたユーザーのみご利用いただけます。' }];
+      } else {
+        const userRecord = getUserRecord(userId);
+        if (!userRecord) {
+          // このエラーは通常発生しないはずだが、念のため
+          writeLog('ERROR', 'AllowlistにはいるがUsersにいない不正な状態', userId);
+          return [{ type: 'text', text: 'エラーが発生しました。お手数ですが、一度LINEの友達登録を解除し、再度登録し直してください。'}];
+        }
+        const sheet = getDatabase_().getSheetByName('Users');
+        const currentTime = sheet.getRange(userRecord.row, 5).getValue();
+        return [getReminderManagementFlexMessage(currentTime)];
+      }
+    }
     case '使い方':
     case 'ヘルプ':
       messageObject = getHelpFlexMessage();
       break;
     case '一覧': {
-      // ★ 変更: createScheduleFlexMessageに渡す引数をuserIdのみに変更
       const carouselMessage = createScheduleFlexMessage(userId);
       
       if (carouselMessage && carouselMessage.type === 'flex') {

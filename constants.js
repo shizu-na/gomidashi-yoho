@@ -41,3 +41,6 @@ const VALIDATION_LIMITS = {
   ITEM_MAX_LENGTH: 20,
   NOTE_MAX_LENGTH: 100,
 };
+
+// 1. このトリガーが担当する時間範囲を設定
+const TRIGGER_INTERVAL_MINUTES = 5;

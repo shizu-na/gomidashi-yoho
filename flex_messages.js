@@ -259,6 +259,59 @@ const helpMessageContents = {
         "contents": [
           {
             "type": "text",
+            "text": "🔔 リマインダー機能",
+            "color": "#FFFFFF",
+            "weight": "bold",
+            "align": "center",
+            "size": "lg"
+          }
+        ],
+        "backgroundColor": "#176FB8",
+        "paddingAll": "12px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "毎日指定した時刻に、\n翌日のごみ出し予定を\n通知します。",
+            "wrap": true,
+            "size": "sm",
+            "align": "center"
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "sm"
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "message",
+              "label": "「リマインダー」を送る",
+              "text": "リマインダー"
+            },
+            "style": "primary",
+            "color": "#176FB8",
+            "height": "sm"
+          }
+        ],
+        "paddingTop": "0px"
+      }
+    },
+    {
+      "type": "bubble",
+      "size": "hecto",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
             "text": "⚙️ 利用の停止（退会）",
             "color": "#FFFFFF",
             "weight": "bold",
@@ -323,10 +376,10 @@ function getTermsAgreementFlexMessage(termsUrl) {
         "contents": [
           {
             "type": "text",
-            "text": "確認画面",
+            "text": "📝 ご利用前の確認",
             "weight": "bold",
             "color": "#FFFFFF",
-            "size": "md",
+            "size": "lg",
             "align": "center"
           }
         ],
@@ -339,15 +392,14 @@ function getTermsAgreementFlexMessage(termsUrl) {
         "contents": [
           {
             "type": "text",
-            "text": "ご利用には、利用規約・プライバシーポリシーの同意が必要です。内容をご確認の上、下のボタンを選択してください。",
+            "text": "ご利用には、利用規約・プライバシーポリシーへの同意が必要です。内容を確認し、下のボタンを選択してください。",
             "wrap": true,
             "size": "sm",
             "align": "center"
           }
         ],
         "paddingAll": "15px",
-        "spacing": "md",
-        "paddingBottom": "0px"
+        "spacing": "md"
       },
       "footer": {
         "type": "box",
@@ -358,15 +410,15 @@ function getTermsAgreementFlexMessage(termsUrl) {
             "type": "button",
             "action": {
               "type": "uri",
-              "label": "《 内容を読む (必須) 》",
-              "uri": TERMS_URL
+              "label": "内容を読む",
+              "uri": "https://example.com/terms"
             },
             "height": "sm",
-            "style": "link",
-            "color": "#FF0000"
+            "style": "link"
           },
           {
-            "type": "separator"
+            "type": "separator",
+            "margin": "md"
           },
           {
             "type": "button",
@@ -377,8 +429,7 @@ function getTermsAgreementFlexMessage(termsUrl) {
             },
             "style": "primary",
             "color": "#5A9E46",
-            "height": "sm",
-            "margin": "md"
+            "height": "sm"
           },
           {
             "type": "button",
@@ -392,6 +443,111 @@ function getTermsAgreementFlexMessage(termsUrl) {
           }
         ],
         "paddingTop": "0px"
+      }
+    }
+  };
+}
+
+/**
+ * リマインダー設定用のFlex Messageを生成します。
+ * @param {string|null} currentReminderTime - 現在設定されている時刻（例: "21:00"）。未設定の場合はnull。
+ * @returns {object} LINE送信用Flex Messageオブジェクト
+ */
+function getReminderManagementFlexMessage(currentReminderTime) {
+  // ★ 変更点: 設定時刻のテキストと、タイムピッカーの初期値を動的に設定
+  const timeDisplayText = currentReminderTime || 'OFF';
+  const timePickerInitial = currentReminderTime || '21:00';
+
+  return {
+    "type": "flex",
+    "altText": "リマインダー設定",
+    "contents": {
+      "type": "bubble",
+      "size": "mega",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "⚙️ リマインダー設定",
+            "weight": "bold",
+            "color": "#FFFFFF",
+            "size": "lg",
+            "align": "center"
+          }
+        ],
+        "backgroundColor": "#176FB8",
+        "paddingAll": "12px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "paddingAll": "15px",
+        "spacing": "none",
+        "contents": [
+          {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "none",
+            "contents": [
+              {
+                "type": "text",
+                "text": "現在の通知時刻",
+                "size": "sm",
+                "align": "center",
+                "color": "#AAAAAA"
+              },
+              {
+                "type": "text",
+                "text": timeDisplayText, // ★ 変更点
+                "weight": "bold",
+                "size": "xxl",
+                "align": "center",
+                "color": "#333333"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "この時刻に明日のごみ出し予定を通知",
+            "wrap": true,
+            "size": "sm",
+            "align": "center",
+            "color": "#555555"
+          }
+        ],
+        "paddingBottom": "0px"
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "sm",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "datetimepicker",
+              "label": "時刻を変更・設定する",
+              "data": "action=setReminderTime",
+              "mode": "time",
+              "initial": timePickerInitial // ★ 変更点
+            },
+            "style": "primary",
+            "height": "sm",
+            "color": "#176FB8"
+          },
+          {
+            "type": "button",
+            "action": {
+              "type": "postback",
+              "label": "リマインダーを停止する",
+              "data": "action=stopReminder"
+            },
+            "style": "secondary",
+            "height": "sm"
+          }
+        ]
       }
     }
   };

@@ -213,3 +213,45 @@ function sanitizeInput_(input) {
   }
   return input;
 }
+
+/**
+ * 指定されたuserIdがAllowlistシートに存在するかを確認します。
+ * @param {string} userId - 確認対象のユーザーID
+ * @returns {boolean} 許可リストに存在すればtrue、しなければfalse
+ */
+function isUserOnAllowlist(userId) {
+  try {
+    const db = getDatabase_();
+    if (!db) return false;
+    const sheet = db.getSheetByName('Allowlist');
+    if (!sheet) return false;
+    const range = sheet.getRange("A:A").createTextFinder(userId).findNext();
+    return range !== null;
+  } catch (e) {
+    writeLog('ERROR', `許可リストの確認でエラー: ${e.message}`, userId);
+    return false;
+  }
+}
+
+/**
+ * 指定されたユーザーのリマインダー時刻を更新します。
+ * @param {string} userId - 更新対象のユーザーID
+ * @param {string|null} time - 設定する時刻（例: "21:00"）。停止する場合はnullを渡す。
+ * @returns {boolean} 更新に成功すればtrue
+ */
+function updateReminderTime(userId, time) {
+  try {
+    const userRecord = getUserRecord(userId);
+    if (!userRecord) return false;
+
+    const db = getDatabase_();
+    if (!db) return false;
+    const sheet = db.getSheetByName('Users');
+    // E列（reminderTime）の値を更新。timeがnullなら空文字を入れる
+    sheet.getRange(userRecord.row, 5).setValue(time || '');
+    return true;
+  } catch (e) {
+    writeLog('ERROR', `リマインダー時刻の更新でエラー: ${e.message}`, userId);
+    return false;
+  }
+}

@@ -185,3 +185,71 @@ function handleNoteInput_(replyToken, userId, newNote, state, cache) {
     replyToLine(replyToken, [getMenuMessage(MESSAGES.error.updateFailed)]);
   }
 }
+
+/**
+ * 登録されている全ユーザーをチェックし、設定時刻になったユーザーにリマインダーを送信します。
+ * この関数をGASのトリガーで5分おきなどの短い間隔で実行します。
+ */
+function sendReminders() {
+  const TRIGGER_INTERVAL_MINUTES = 5; // この定数は constants.js に移動するのがベストです
+
+  // ★ 変更：必ず日本標準時(JST)で現在時刻を取得する
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+  
+  const db = getDatabase_();
+  if (!db) return;
+  const usersSheet = db.getSheetByName('Users');
+  if (!usersSheet || usersSheet.getLastRow() < 2) return;
+
+  const allUsersData = usersSheet.getDataRange().getValues();
+  allUsersData.shift();
+
+  const usersToRemind = allUsersData.filter(userRow => {
+    const status = userRow[COLUMNS_USER.STATUS];
+    const reminderTime = userRow[4];
+
+    if (status !== USER_STATUS.ACTIVE || typeof reminderTime !== 'string' || reminderTime === '') {
+      return false;
+    }
+    
+    const [hour, minute] = reminderTime.split(':');
+    
+    // ★ 変更：比較対象の時刻も、JSTの「今日」の日付でDateオブジェクトに変換
+    const reminderDate = new Date(now); // JSTのnowをコピーして日付部分を利用
+    reminderDate.setHours(parseInt(hour, 10));
+    reminderDate.setMinutes(parseInt(minute, 10));
+    reminderDate.setSeconds(0);
+    reminderDate.setMilliseconds(0);
+
+    const timeDiff = now.getTime() - reminderDate.getTime();
+    return timeDiff >= 0 && timeDiff < TRIGGER_INTERVAL_MINUTES * 60 * 1000;
+  });
+
+  // 4. 該当者一人ひとりにリマインダーを送信（この部分は変更ありません）
+  usersToRemind.forEach(userRow => {
+    const userId = userRow[COLUMNS_USER.USER_ID];
+    
+    const tomorrow = new Date(now); // ★ 念のため、こちらもJSTのnowを基準にします
+    tomorrow.setDate(now.getDate() + 1);
+    const tomorrowDayIndex = (tomorrow.getDay() + 6) % 7;
+    const targetDay = WEEKDAYS_FULL[tomorrowDayIndex];
+
+    const schedules = getSchedulesByUserId(userId);
+    const tomorrowSchedule = schedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
+
+    let messageText = '';
+    if (tomorrowSchedule) {
+      const item = tomorrowSchedule[COLUMNS_SCHEDULE.GARBAGE_TYPE];
+      const note = tomorrowSchedule[COLUMNS_SCHEDULE.NOTES];
+      
+      messageText = `【リマインダー🔔】\n明日のごみは「${item}」です。`;
+      if (note && note !== '-') {
+        messageText += `\n\n📝 メモ:\n${note}`;
+      }
+    } else {
+      messageText = '【リマインダー🔔】\n明日のごみ出し情報の取得に失敗しました。';
+    }
+
+    pushToLine(userId, [{ type: 'text', text: messageText }]);
+  });
+}

@@ -81,12 +81,13 @@ function formatMessage(text, ...args) {
 function getFallbackMessage() {
   return {
     'type': 'text',
-    'text': 'ご用件が分かりませんでした。\n下のボタンから操作を選んでください。',
+    'text': 'ご用件が分かりませんでした。下のボタンから操作を選んでください。',
     'quickReply': {
       'items': [
         { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧', 'text': '一覧' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': '今日', 'text': '今日' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': '明日', 'text': '明日' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'リマインダー', 'text': 'リマインダー' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': 'ヘルプ', 'text': 'ヘルプ' } },
       ]
     }
@@ -107,6 +108,7 @@ function getMenuMessage(text) {
         { 'type': 'action', 'action': { 'type': 'message', 'label': '一覧', 'text': '一覧' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': '今日', 'text': '今日' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': '明日', 'text': '明日' } },
+        { 'type': 'action', 'action': { 'type': 'message', 'label': 'リマインダー', 'text': 'リマインダー' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': 'ヘルプ', 'text': 'ヘルプ' } },
       ]
     }
