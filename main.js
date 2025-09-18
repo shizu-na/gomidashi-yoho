@@ -4,6 +4,7 @@
 
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 const SECRET_TOKEN = PropertiesService.getScriptProperties().getProperty('SECRET_TOKEN');
+const TERMS_URL = 'https://shizu-na.github.io/gomidashi-yoho/policy'; // ★ あなたのリポジトリのURLに書き換えてください
 
 /**
  * LINEからのWebhookリクエストを処理するメイン関数
@@ -34,7 +35,6 @@ function doPost(e) {
 
 /**
  * フォローイベント（友だち追加・ブロック解除）を処理します。
- * @param {object} event - LINEイベントオブジェクト
  */
 function handleFollowEvent(event) {
   const replyToken = event.replyToken;
@@ -42,20 +42,16 @@ function handleFollowEvent(event) {
   const userRecord = getUserRecord(userId);
 
   if (!userRecord) {
-    // 全くの新規ユーザー
-    const textArray = MESSAGES.event.follow_new.slice(); // 元の配列を壊さないようにコピー
-    const lastText = textArray.pop(); // 最後の文章を取り出す
-    
-    const messages = textArray.map(text => ({ type: 'text', text: text })); // 途中までのメッセージを作成
-    messages.push(getRegistrationPromptMessage(lastText)); // 最後の文章にボタンを付けて追加
-    
+    // ★ 変更: 「挨拶」「Bot紹介」「同意確認」の3メッセージを送る
+    const messages = [
+      { type: 'text', text: MESSAGES.event.follow_new },
+      { type: 'text', text: MESSAGES.event.bot_description },
+      getTermsAgreementFlexMessage(TERMS_URL)
+    ];
     replyToLine(replyToken, messages);
   } else if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
-    // 退会済みのユーザー
     replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.event.follow_rejoin_prompt)]);
   } else {
-    // 登録済みでアクティブなユーザー
-    // ★ 変更: 行き止まり解消のためメニューを追加
     replyToLine(replyToken, [getMenuMessage(MESSAGES.event.follow_welcome_back)]);
   }
 }
@@ -82,36 +78,67 @@ function parseQueryString_(query) {
 }
 
 /**
- * ポストバックイベントを処理します。対話中はロックをかけて重複実行を防ぎます。
- * @param {object} event - LINEイベントオブジェクト
+ * ポストバックイベントを処理します。
+ * LockServiceを使用して、処理の重複実行（競合状態）を確実に防ぎます。
  */
 function handlePostback(event) {
   const userId = event.source.userId;
-  const cache = CacheService.getUserCache();
+  // ユーザーごとに独立したロックを取得
+  const lock = LockService.getUserLock();
 
-  // 現在の対話状態（state）をキャッシュから取得
-  const currentState = cache.get(userId);
-  // もし対話状態が存在するなら、すでに他の対話が進行中なので処理を終了
-  if (currentState) {
+  // 100ミリ秒だけロックの取得を試みる
+  if (!lock.tryLock(100)) {
+    // ロックが取得できなかった場合（他の処理が実行中）、何もせずに終了
     return;
   }
 
-  const replyToken = event.replyToken;
-  const postbackData = event.postback.data;
-  
-  const params = parseQueryString_(postbackData);
-  const action = params['action'];
+  try {
+    // --- ここから下がメインの処理 ---
 
-  if (action === 'startChange') {
-    const day = params['day'];
-    startModificationFlow(replyToken, userId, day);
+    const cache = CacheService.getUserCache();
+    const replyToken = event.replyToken;
+    const params = parseQueryString_(event.postback.data);
+    const action = params.action;
+
+    switch(action) {
+      case 'agreeToTerms': {
+        const userRecord = getUserRecord(userId);
+        if (!userRecord) {
+          createNewUser(userId);
+          writeLog('INFO', '新規ユーザー登録（利用規約同意）', userId);
+          replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.agreed)]);
+        } else if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
+          updateUserStatus(userId, USER_STATUS.ACTIVE);
+          replyToLine(replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
+        } else {
+          replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.already_active)]);
+        }
+        break;
+      }
+
+      case 'disagreeToTerms':
+        replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.disagreed }]);
+        break;
+
+      case 'startChange': {
+        const currentState = cache.get(userId);
+        if (currentState) {
+          return;
+        }
+        const day = params.day;
+        startModificationFlow(replyToken, userId, day);
+        break;
+      }
+    }
+
+  } finally {
+    // 処理が成功してもエラーで終了しても、必ずロックを解放する
+    lock.releaseLock();
   }
 }
 
 /**
  * 全てのメッセージイベントを処理する司令塔です。
- * ユーザーの状態（未登録、登録済み、退会済み）に応じて処理を分岐します。
- * @param {object} event - LINEイベントオブジェクト
  */
 function handleMessage(event) {
   if (event.message.type !== 'text') {
@@ -131,24 +158,10 @@ function handleMessage(event) {
 
   const userRecord = getUserRecord(userId);
 
-  // 未登録ユーザーのハンドリング
+  // ★ 変更: 未登録ユーザーのハンドリングをシンプル化
   if (!userRecord) {
-    if (userMessage === 'はじめる') {
-      createNewUser(userId);
-      writeLog('INFO', '新規ユーザー登録', userId);
-
-      const textArray = MESSAGES.registration.success.slice();
-      const lastText = textArray.pop();
-
-      const messages = textArray.map(text => ({ type: 'text', text: text }));
-      messages.push(getMenuMessage(lastText)); // 最後の文章にメニューを付けて追加
-
-      replyToLine(replyToken, messages);
-    } else if (userMessage === '使い方' || userMessage === 'ヘルプ') {
-      replyToLine(replyToken, [getHelpFlexMessage()]);
-    } else {
-      replyToLine(replyToken, [getRegistrationPromptMessage(MESSAGES.registration.prompt)]);
-    }
+    // 未登録のユーザーからのメッセージには、常に同意確認を返す
+    replyToLine(replyToken, [getTermsAgreementFlexMessage(TERMS_URL)]);
     return;
   }
 

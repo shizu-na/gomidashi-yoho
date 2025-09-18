@@ -304,3 +304,95 @@ const helpMessageContents = {
     }
   ]
 };
+
+/**
+ * 利用規約への同意を求めるFlex Messageを生成します。
+ * @param {string} termsUrl - 利用規約ページのURL
+ * @returns {object} LINE送信用Flex Messageオブジェクト
+ */
+function getTermsAgreementFlexMessage(termsUrl) {
+  return {
+    "type": "flex",
+    "altText": "ご利用には利用規約への同意が必要です。",
+    "contents": {
+      "type": "bubble",
+      "size": "mega",
+      "header": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "確認画面",
+            "weight": "bold",
+            "color": "#FFFFFF",
+            "size": "md",
+            "align": "center"
+          }
+        ],
+        "backgroundColor": "#6C757D",
+        "paddingAll": "12px"
+      },
+      "body": {
+        "type": "box",
+        "layout": "vertical",
+        "contents": [
+          {
+            "type": "text",
+            "text": "ご利用には、利用規約・プライバシーポリシーの同意が必要です。内容をご確認の上、下のボタンを選択してください。",
+            "wrap": true,
+            "size": "sm",
+            "align": "center"
+          }
+        ],
+        "paddingAll": "15px",
+        "spacing": "md",
+        "paddingBottom": "0px"
+      },
+      "footer": {
+        "type": "box",
+        "layout": "vertical",
+        "spacing": "sm",
+        "contents": [
+          {
+            "type": "button",
+            "action": {
+              "type": "uri",
+              "label": "《 内容を読む (必須) 》",
+              "uri": TERMS_URL
+            },
+            "height": "sm",
+            "style": "link",
+            "color": "#FF0000"
+          },
+          {
+            "type": "separator"
+          },
+          {
+            "type": "button",
+            "action": {
+              "type": "postback",
+              "label": "同意して利用を開始する",
+              "data": "action=agreeToTerms"
+            },
+            "style": "primary",
+            "color": "#5A9E46",
+            "height": "sm",
+            "margin": "md"
+          },
+          {
+            "type": "button",
+            "action": {
+              "type": "postback",
+              "label": "同意しない",
+              "data": "action=disagreeToTerms"
+            },
+            "style": "secondary",
+            "height": "sm"
+          }
+        ],
+        "paddingTop": "0px"
+      }
+    }
+  };
+}

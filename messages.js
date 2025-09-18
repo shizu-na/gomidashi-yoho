@@ -14,22 +14,16 @@ const MESSAGES = {
   },
   // イベント（友だち追加時）
   event: {
-    follow_new: [
-      '友だち追加ありがとうございます！🙌',
-      'ここでは、ごみ出しの予定を管理・確認することができます。',
-      'まずは「はじめる」を押して、ご利用を開始しましょう！'
-    ],
+    follow_new: '友だち追加ありがとうございます！🙌', 
+    bot_description: '「あれ、今日のゴミなんだっけ？」を解決する、あなた専用のゴミ出し日管理Botです。',
     follow_welcome_back: 'おかえりなさい！\n引き続き、ごみ出し予報をご利用いただけます。',
     follow_rejoin_prompt: 'おかえりなさい！\n以前のスケジュールが保存されています。ご利用を再開しますか？',
   },
   // 登録
   registration: {
-    success: [
-      '✅ ありがとうございます。',
-      '早速、「一覧」を押してみてください！予定やメモを確認できます。',
-      '今はまだ、ごみの品目やメモが書かれていないと思います。'
-    ],
-    prompt: 'ご利用には、まず「はじめる」を押してから開始してください。',
+    agreed: '✅ 同意ありがとうございます！\n早速、「一覧」を押して、ごみ出しの予定を確認・編集してみましょう。',
+    disagreed: 'ご利用いただくには、利用規約への同意が必要です。\n\n同意いただける場合は、もう一度何かメッセージを送ってください。',
+    already_active: 'すでにご利用登録が完了しています。'
   },
   // 退会・再開
   unregistration: {
@@ -168,23 +162,6 @@ function getModificationNotePromptMessage(currentNote) {
       'items': [
         { 'type': 'action', 'action': { 'type': 'message', 'label': 'スキップ', 'text': 'スキップ' } },
         { 'type': 'action', 'action': { 'type': 'message', 'label': 'キャンセル', 'text': 'キャンセル' } }
-      ]
-    }
-  };
-}
-
-/**
- * 登録を促すメッセージ（クイックリプライ付き）を生成します。
- * @param {string} text - 表示するテキスト
- * @returns {object} LINE送信用メッセージオブジェクト
- */
-function getRegistrationPromptMessage(text) {
-  return {
-    'type': 'text',
-    'text': text,
-    'quickReply': {
-      'items': [
-        { 'type': 'action', 'action': { 'type': 'message', 'label': 'はじめる', 'text': 'はじめる' } }
       ]
     }
   };
