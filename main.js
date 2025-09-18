@@ -1,29 +1,27 @@
 /**
  * @fileoverview LINEからのWebhookリクエストを処理し、各機能へ振り分けるメインスクリプトです。
+ * @author shizu-na
  */
 
-// スクリプトプロパティから取得する値は、一度定数に格納してから利用します。
+// スクリプトプロパティから利用する定数
 const CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty('LINE_CHANNEL_ACCESS_TOKEN');
 const SECRET_TOKEN = PropertiesService.getScriptProperties().getProperty('SECRET_TOKEN');
 const DATABASE_SHEET_ID = PropertiesService.getScriptProperties().getProperty('DATABASE_SHEET_ID');
 const LOG_ID = PropertiesService.getScriptProperties().getProperty('LOG_ID');
-const TERMS_URL = 'https://shizu-na.github.io/gomidashi-yoho/policy'; // ★ ご自身のGitHub Pages等のURLに設定してください
+const TERMS_URL = 'https://shizu-na.github.io/gomidashi-yoho/policy';
 
 /**
- * LINEからのWebhookリクエストを処理するメイン関数
+ * LINEからのWebhookリクエストを処理するメイン関数です。
  * @param {GoogleAppsScript.Events.DoPost} e - Webhookイベントオブジェクト
  */
 function doPost(e) {
-  // Webhook URLに含まれるトークンを検証
-  const receivedToken = e.parameter.token;
-  if (receivedToken !== SECRET_TOKEN) {
-    console.error("不正なリクエストです: トークンが一致しません。");
+  if (e.parameter.token !== SECRET_TOKEN) {
+    console.error('不正なリクエスト: トークンが一致しません。');
     return;
   }
 
   try {
     const event = JSON.parse(e.postData.contents).events[0];
-
     switch (event.type) {
       case 'message':
         handleMessage(event);
@@ -41,35 +39,53 @@ function doPost(e) {
 }
 
 /**
- * フォローイベント（友だち追加・ブロック解除）を処理します。
+ * ユーザーからのメッセージイベントを処理します。
+ * @param {object} event - LINE Messaging APIのイベントオブジェクト
  */
-function handleFollowEvent(event) {
-  const replyToken = event.replyToken;
-  const userId = event.source.userId;
-  const userRecord = getUserRecord(userId);
+function handleMessage(event) {
+  try {
+    if (event.message.type !== 'text') return;
 
-  if (!userRecord) {
-    const messages = [
-      { type: 'text', text: MESSAGES.event.follow_new },
-      { type: 'text', text: MESSAGES.event.bot_description },
-      getTermsAgreementFlexMessage(TERMS_URL)
-    ];
-    replyToLine(replyToken, messages);
-  } else if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
-    replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.event.follow_rejoin_prompt)]);
-  } else {
-    replyToLine(replyToken, [getMenuMessage(MESSAGES.event.follow_welcome_back)]);
+    const userId = event.source.userId;
+    const replyToken = event.replyToken;
+    const userMessage = event.message.text.trim();
+
+    // 対話フロー（スケジュール編集中）かどうかを最優先で判定
+    const cache = CacheService.getUserCache();
+    const cachedState = cache.get(userId);
+    if (cachedState) {
+      continueModificationFlow(replyToken, userId, userMessage, cachedState);
+      return;
+    }
+
+    // ユーザー状態に応じた処理
+    const user = getUser(userId);
+    if (!user) {
+      replyToLine(replyToken, [getTermsAgreementFlexMessage(TERMS_URL)]);
+      return;
+    }
+    if (user.status === USER_STATUS.UNSUBSCRIBED) {
+      handleReactivation(replyToken, userId, userMessage);
+      return;
+    }
+
+    // 通常のコマンド処理
+    const replyMessages = executeCommand(event);
+    if (replyMessages) {
+      replyToLine(replyToken, replyMessages);
+    } else {
+      replyToLine(replyToken, [getFallbackMessage()]);
+    }
+  } catch (err) {
+    writeLog('ERROR', `handleMessage処理中にエラー: ${err.stack}`, event.source.userId);
   }
 }
 
+/**
+ * ユーザーからのポストバックイベントを処理します。
+ * @param {object} event - LINE Messaging APIのイベントオブジェクト
+ */
 function handlePostback(event) {
-  // LockServiceの部分は、最終的に決まった方式（LockService or CacheService）をお使いください
-  const lock = LockService.getUserLock();
-  if (!lock.tryLock(5000)) {
-    writeLog('INFO', 'ボタン連打により処理をスキップしました。', userId);
-    return;
-  }
-  
   try {
     const userId = event.source.userId;
     const replyToken = event.replyToken;
@@ -78,30 +94,20 @@ function handlePostback(event) {
 
     switch (action) {
       case 'agreeToTerms':
-        // (省略...変更なし)
+        handleTermsAgreement(replyToken, userId);
         break;
       case 'disagreeToTerms':
-        // (省略...変更なし)
+        replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.disagreed }]);
         break;
-        
-      // ★ 変更点: 'setReminderTime' と 'stopReminder' の処理を更新
       case 'setReminderTime': {
         const selectedTime = event.postback.params.time;
-        const type = params.type; // 'night' or 'morning' を取得
-        updateReminderTime(userId, selectedTime, type);
-        
-        const typeText = (type === 'night') ? '夜' : '朝';
-        const replyText = `✅ 承知いたしました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
-        replyToLine(replyToken, [getMenuMessage(replyText)]);
+        const type = params.type;
+        handleSetReminderTime(replyToken, userId, selectedTime, type);
         break;
       }
       case 'stopReminder': {
-        const type = params.type; // 'night' or 'morning' を取得
-        updateReminderTime(userId, null, type);
-        
-        const typeText = (type === 'night') ? '夜' : '朝';
-        const replyText = `✅【${typeText}のリマインダー】を停止しました。`;
-        replyToLine(replyToken, [getMenuMessage(replyText)]);
+        const type = params.type;
+        handleStopReminder(replyToken, userId, type);
         break;
       }
       case 'startChange': {
@@ -112,82 +118,46 @@ function handlePostback(event) {
     }
   } catch (err) {
     writeLog('ERROR', `handlePostback処理中にエラー: ${err.stack}`, event.source.userId);
-  } finally {
-    lock.releaseLock();
   }
 }
 
 /**
- * 全てのメッセージイベントを処理する司令塔です。
+ * ユーザーからのフォローイベント（友だち追加）を処理します。
+ * @param {object} event - LINE Messaging APIのイベントオブジェクト
  */
-function handleMessage(event) {
+function handleFollowEvent(event) {
+  const replyToken = event.replyToken;
   const userId = event.source.userId;
-  Logger.log(`[${userId}] handleMessage 実行開始`);
+  const user = getUser(userId);
 
-  const lock = LockService.getUserLock();
-  if (!lock.tryLock(5000)) {
-    writeLog('INFO', 'メッセージ連打により処理をスキップしました。', userId);
-    Logger.log(`[${userId}] ロック取得失敗、処理スキップ`);
-    return;
-  }
-  
-  Logger.log(`[${userId}] ロック取得成功`);
-
-  try {
-    if (event.message.type !== 'text') {
-      return;
-    }
-    const replyToken = event.replyToken;
-    const userMessage = event.message.text.trim();
-
-    const cache = CacheService.getUserCache();
-    const cachedState = cache.get(userId);
-    if (cachedState) {
-      continueModification(replyToken, userId, userMessage, cachedState);
-      return;
-    }
-
-    const userRecord = getUserRecord(userId);
-    if (!userRecord) {
-      replyToLine(replyToken, [getTermsAgreementFlexMessage(TERMS_URL)]);
-      return;
-    }
-
-    if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
-      if (userMessage === '利用を再開する') {
-        updateUserStatus(userId, USER_STATUS.ACTIVE);
-        replyToLine(replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
-      } else {
-        replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.unregistration.unsubscribed)]);
-      }
-      return;
-    }
-
-    const replyMessages = createReplyMessage(event);
-    if (replyMessages && replyMessages.length > 0) {
-      replyToLine(replyToken, replyMessages);
-    } else {
-      replyToLine(replyToken, [getFallbackMessage()]);
-    }
-  } catch (err) {
-    writeLog('ERROR', `handleMessage処理中にエラー: ${err.stack}`, userId);
-  } finally {
-    lock.releaseLock();
-    Logger.log(`[${userId}] ロック解放`);
+  if (!user) {
+    // 新規ユーザー
+    const messages = [
+      { type: 'text', text: MESSAGES.event.follow_new },
+      { type: 'text', text: MESSAGES.event.bot_description },
+      getTermsAgreementFlexMessage(TERMS_URL)
+    ];
+    replyToLine(replyToken, messages);
+  } else if (user.status === USER_STATUS.UNSUBSCRIBED) {
+    // 再ブロックしたユーザー
+    replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.event.follow_rejoin_prompt)]);
+  } else {
+    // 登録済みユーザー
+    replyToLine(replyToken, [getMenuMessage(MESSAGES.event.follow_welcome_back)]);
   }
 }
 
 /**
- * ポストバックデータを解析するためのヘルパー関数です。
+ * ポストバックデータ（クエリ文字列）をオブジェクトに変換します。
+ * @private
+ * @param {string} query - `key=value&key2=value2`形式の文字列
+ * @returns {object} パース後のオブジェクト
  */
 function parseQueryString_(query) {
-  const params = {};
-  if (!query) return params;
-  query.split('&').forEach(pair => {
+  if (!query) return {};
+  return query.split('&').reduce((acc, pair) => {
     const parts = pair.split('=').map(decodeURIComponent);
-    if (parts.length === 2) {
-      params[parts[0]] = parts[1];
-    }
-  });
-  return params;
+    if (parts.length === 2) acc[parts[0]] = parts[1];
+    return acc;
+  }, {});
 }
