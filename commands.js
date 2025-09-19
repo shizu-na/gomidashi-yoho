@@ -1,71 +1,110 @@
 /**
- * @fileoverview ユーザーコマンドの実行と関連ロジックを管理します。
- * @author shizu-na
+ * @fileoverview ユーザーからのメッセージ(コマンド)に応じた応答を生成するロジックです。
  */
 
 /**
- * ユーザーメッセージを解析し、適切なコマンドを実行して返信メッセージを生成します。
- * @param {object} event - LINE Messaging APIのイベントオブジェクト
- * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、または該当コマンドがない場合はnull
+ * ユーザーメッセージに基づき、適切な返信メッセージオブジェクトを生成します。
+ * @param {object} event - LINE Webhookイベントオブジェクト
+ * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
  */
-function executeCommand(event) {
+function createReplyMessage(event) {
   const userMessage = event.message.text.trim();
   const userId = event.source.userId;
 
-  switch (userMessage) {
-    case '退会':
-      return handleUnregistration(userId);
-    case 'リマインダー':
-      return handleReminderCommand(userId);
-    case '使い方':
-    case 'ヘルプ':
-      return [getHelpFlexMessage()];
-    case '一覧':
-      return handleListCommand(userId);
-    case '今日':
-    case 'きょう':
-    case '明日':
-    case 'あした':
-      return handleGarbageQuery(userMessage, userId);
-    default:
-      return null;
+  try {
+    let messages = null;
+
+    switch (userMessage) {
+      case '退会':
+        messages = [_handleUnregistration(userId)];
+        break;
+      case 'リマインダー':
+        messages = _handleReminder(userId);
+        break;
+      case '使い方':
+      case 'ヘルプ':
+        messages = [getHelpFlexMessage()];
+        break;
+      case '一覧':
+        messages = _handleScheduleList(userId);
+        break;
+      default:
+        // '今日', '明日' などのキーワード応答を処理
+        messages = handleGarbageQuery(userMessage, userId);
+        break;
+    }
+
+    if (messages) {
+      return Array.isArray(messages) ? messages : [messages];
+    }
+    return null; // どのコマンドにも一致しない場合
+
+  } catch (err) {
+    writeLog('CRITICAL', `createReplyMessageで予期せぬエラー: ${err.stack}`, userId);
+    return [{ type: 'text', text: MESSAGES.common.error }];
+  }
+}
+
+/**
+ * 「退会」コマンドを処理します。
+ * @private
+ * @param {string} userId - ユーザーID
+ * @returns {object} 送信するメッセージオブジェクト
+ */
+function _handleUnregistration(userId) {
+  try {
+    updateUserStatus(userId, USER_STATUS.UNSUBSCRIBED);
+    writeLog('INFO', 'ユーザー退会（論理削除）', userId);
+    return { type: 'text', text: MESSAGES.unregistration.success };
+  } catch (e) {
+    writeLog('ERROR', `退会処理: ${e.message}`, userId);
+    return { type: 'text', text: MESSAGES.common.error };
   }
 }
 
 /**
  * 「リマインダー」コマンドを処理します。
- * @param {string} userId
- * @returns {Array<object>}
+ * @private
+ * @param {string} userId - ユーザーID
+ * @returns {Array<object>} 送信するメッセージオブジェクトの配列
  */
-function handleReminderCommand(userId) {
-  if (!isUserOnAllowlist(userId)) {
-    return [{ type: 'text', text: MESSAGES.error.not_allowed }];
+function _handleReminder(userId) {
+  // if (!isUserOnAllowlist(userId)) {
+  //   return [{ type: 'text', text: '申し訳ありません。この機能は許可されたユーザーのみご利用いただけます。' }];
+  // }
+
+  const userRecord = getUserRecord(userId);
+  if (!userRecord) {
+    writeLog('ERROR', '「リマインダー」処理中にユーザーレコード取得失敗。', userId);
+    return [{ type: 'text', text: 'ユーザー情報が見つかりませんでした。'}];
   }
-  const user = getUser(userId);
-  if (!user) {
-    return [{ type: 'text', text: MESSAGES.error.user_not_found }];
-  }
-  return [getReminderManagementFlexMessage(user.nightTime, user.morningTime)];
+
+  const { nightTime, morningTime } = getReminderTimes(userRecord.row);
+  const flexMessage = getReminderManagementFlexMessage(nightTime, morningTime);
+  return [flexMessage];
 }
 
 /**
  * 「一覧」コマンドを処理します。
- * @param {string} userId
- * @returns {Array<object>}
+ * @private
+ * @param {string} userId - ユーザーID
+ * @returns {Array<object>} 送信するメッセージオブジェクトの配列
  */
-function handleListCommand(userId) {
+function _handleScheduleList(userId) {
   const carouselMessage = createScheduleFlexMessage(userId);
   if (carouselMessage && carouselMessage.type === 'flex') {
-    return [carouselMessage, { type: 'text', text: MESSAGES.flex.schedulePrompt }];
+    const promptMessage = { type: 'text', text: MESSAGES.flex.schedulePrompt };
+    return [carouselMessage, promptMessage];
   }
-  return [carouselMessage]; // スケジュール未登録時のテキストメッセージ
+  // スケジュール未登録などの場合は、単一のメッセージオブジェクトが返る
+  return [carouselMessage];
 }
 
 /**
- * 「今日」「明日」の問い合わせを処理します。
- * @param {string} command - ユーザーが入力したコマンド
- * @param {string} userId
- * @returns {Array<object>|null}
+ * 「今日」「明日」などのごみ出し日に関する問い合わせを処理します。
+ * @param {string} command - ユーザーが入力したコマンド (例: '今日')
+ * @param {string} userId - ユーザーID
+ * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
  */
 function handleGarbageQuery(command, userId) {
   const data = getSchedulesByUserId(userId);
@@ -74,17 +113,24 @@ function handleGarbageQuery(command, userId) {
   }
 
   const todayJST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-  let targetDay, title;
+  let targetDay;
+  let title;
 
-  if (command.startsWith('今日') || command.startsWith('きょう')) {
-    targetDay = WEEKDAYS_FULL[(todayJST.getDay() + 6) % 7];
-    title = MESSAGES.query.todayTitle;
-  } else {
+  if (command === '今日' || command === 'きょう') {
+    const dayOfWeek = todayJST.getDay(); // 元の日曜=0, 月曜=1...
+    const targetDayIndex = (dayOfWeek === 0) ? 6 : dayOfWeek - 1; // 月曜=0, ..., 日曜=6 に変換
+    targetDay = WEEKDAYS_FULL[targetDayIndex];
+    title = '今日のごみ🗑️';
+  } else if (command === '明日' || command === 'あした') {
     const tomorrowJST = new Date(todayJST);
     tomorrowJST.setDate(tomorrowJST.getDate() + 1);
-    targetDay = WEEKDAYS_FULL[(tomorrowJST.getDay() + 6) % 7];
-    title = MESSAGES.query.tomorrowTitle;
+    const dayOfWeek = tomorrowJST.getDay(); // 元の日曜=0, 月曜=1...
+    const targetDayIndex = (dayOfWeek === 0) ? 6 : dayOfWeek - 1; // 月曜=0, ..., 日曜=6 に変換
+    targetDay = WEEKDAYS_FULL[targetDayIndex];
+    title = '明日のごみ🗑️';
   }
+
+  if (!targetDay) return null; // '今日' '明日' 以外のメッセージ
 
   const foundRow = data.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
   if (!foundRow) {
@@ -93,116 +139,50 @@ function handleGarbageQuery(command, userId) {
 
   const item = foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE];
   const note = foundRow[COLUMNS_SCHEDULE.NOTES];
-  const altText = formatMessage(MESSAGES.query.altText, targetDay, item);
+  const altText = `${targetDay}のごみは「${item}」です。`;
 
-  return [createSingleDayFlexMessage(title, targetDay, item, note, altText, true)];
+  const flexMessage = createSingleDayFlexMessage(title, targetDay, item, note, altText, true);
+  return [flexMessage];
 }
 
-/**
- * 退会処理を実行します。
- * @param {string} userId
- * @returns {Array<object>}
- */
-function handleUnregistration(userId) {
-  const success = updateUserStatus(userId, USER_STATUS.UNSUBSCRIBED);
-  const text = success ? MESSAGES.unregistration.success : MESSAGES.common.error;
-  return [{ type: 'text', text }];
-}
+// --- 予定変更フロー -----------------------------------------------------------
 
 /**
- * 利用規約への同意を処理します。
- * @param {string} replyToken
- * @param {string} userId
- */
-function handleTermsAgreement(replyToken, userId) {
-  const user = getUser(userId);
-  let text;
-  if (!user) {
-    createNewUser(userId);
-    text = MESSAGES.registration.agreed;
-  } else if (user.status === USER_STATUS.UNSUBSCRIBED) {
-    updateUserStatus(userId, USER_STATUS.ACTIVE);
-    text = MESSAGES.unregistration.reactivate;
-  } else {
-    text = MESSAGES.registration.already_active;
-  }
-  replyToLine(replyToken, [getMenuMessage(text)]);
-}
-
-/**
- * 利用再開のプロンプトを処理します。
- * @param {string} replyToken
- * @param {string} userId
- * @param {string} userMessage
- */
-function handleReactivation(replyToken, userId, userMessage) {
-  if (userMessage === MESSAGES.unregistration.reactivate_command) {
-    updateUserStatus(userId, USER_STATUS.ACTIVE);
-    replyToLine(replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
-  } else {
-    replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.unregistration.unsubscribed)]);
-  }
-}
-
-/**
- * リマインダー時刻設定を処理します。
- * @param {string} replyToken
- * @param {string} userId
- * @param {string} selectedTime
- * @param {string} type - 'night' または 'morning'
- */
-function handleSetReminderTime(replyToken, userId, selectedTime, type) {
-  updateReminderTime(userId, selectedTime, type);
-  const typeText = (type === 'night') ? '夜' : '朝';
-  const text = formatMessage(MESSAGES.reminder.set, typeText, selectedTime);
-  replyToLine(replyToken, [getMenuMessage(text)]);
-}
-
-/**
- * リマインダー停止を処理します。
- * @param {string} replyToken
- * @param {string} userId
- * @param {string} type - 'night' または 'morning'
- */
-function handleStopReminder(replyToken, userId, type) {
-  updateReminderTime(userId, null, type);
-  const typeText = (type === 'night') ? '夜' : '朝';
-  const text = formatMessage(MESSAGES.reminder.stop, typeText);
-  replyToLine(replyToken, [getMenuMessage(text)]);
-}
-
-// --- スケジュール変更フロー ---
-
-/**
- * スケジュール変更の対話フローを開始します。
- * @param {string} replyToken
- * @param {string} userId
+ * 予定変更フローを開始します。
+ * @param {string} replyToken - リプライトークン
+ * @param {string} userId - ユーザーID
  * @param {string} dayToModify - 変更対象の曜日
  */
 function startModificationFlow(replyToken, userId, dayToModify) {
-  const schedule = getSchedulesByUserId(userId).find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === dayToModify) || [];
+  const schedules = getSchedulesByUserId(userId);
+  const foundRow = schedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === dayToModify);
+  const currentItem = foundRow ? foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE] : '（未設定）';
+  const currentNote = foundRow ? foundRow[COLUMNS_SCHEDULE.NOTES] : '（未設定）';
+
   const state = {
     step: MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM,
     day: dayToModify,
-    currentItem: schedule[COLUMNS_SCHEDULE.GARBAGE_TYPE] || '（未設定）',
-    currentNote: schedule[COLUMNS_SCHEDULE.NOTES] || '（未設定）',
+    currentItem: currentItem,
+    currentNote: currentNote,
   };
-  CacheService.getUserCache().put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
-  replyToLine(replyToken, [getModificationItemPromptMessage(state.day)]);
+  const cache = CacheService.getUserCache();
+  cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
+
+  replyToLine(replyToken, [getModificationItemPromptMessage(dayToModify, currentItem)]);
 }
 
 /**
- * スケジュール変更の対話フローを継続します。
- * @param {string} replyToken
- * @param {string} userId
- * @param {string} userMessage
- * @param {string} cachedState
+ * 予定変更フローの対話を継続します。
+ * @param {string} replyToken - リプライトークン
+ * @param {string} userId - ユーザーID
+ * @param {string} userMessage - ユーザーからの入力メッセージ
+ * @param {string} cachedState - キャッシュされている対話状態
  */
-function continueModificationFlow(replyToken, userId, userMessage, cachedState) {
+function continueModification(replyToken, userId, userMessage, cachedState) {
   const state = JSON.parse(cachedState);
   const cache = CacheService.getUserCache();
 
-  if (userMessage === MESSAGES.common.cancel_command) {
+  if (userMessage === 'キャンセル') {
     cache.remove(userId);
     replyToLine(replyToken, [getMenuMessage(MESSAGES.common.cancel)]);
     return;
@@ -210,10 +190,10 @@ function continueModificationFlow(replyToken, userId, userMessage, cachedState) 
 
   switch (state.step) {
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM:
-      handleItemInput_(replyToken, userId, userMessage, state, cache);
+      _handleItemInput(replyToken, userId, userMessage, state, cache);
       break;
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_NOTE:
-      handleNoteInput_(replyToken, userId, userMessage, state, cache);
+      _handleNoteInput(replyToken, userId, userMessage, state, cache);
       break;
     default:
       cache.remove(userId);
@@ -223,83 +203,96 @@ function continueModificationFlow(replyToken, userId, userMessage, cachedState) 
 }
 
 /**
- * [対話] 品目入力の処理
+ * 予定変更フロー：品目入力の処理
  * @private
  */
-function handleItemInput_(replyToken, userId, newItem, state, cache) {
-  if (newItem !== MESSAGES.common.skip_command && newItem.length > VALIDATION_LIMITS.ITEM_MAX_LENGTH) {
-    const text = formatMessage(MESSAGES.modification.itemTooLong, VALIDATION_LIMITS.ITEM_MAX_LENGTH);
-    replyToLine(replyToken, [{ type: 'text', text: text }]);
+function _handleItemInput(replyToken, userId, newItem, state, cache) {
+  if (newItem !== 'スキップ' && newItem.length > VALIDATION_LIMITS.ITEM_MAX_LENGTH) {
+    const errorMessage = getModificationItemPromptMessage(state.day, state.currentItem);
+    errorMessage.text = formatMessage(MESSAGES.modification.itemTooLong, VALIDATION_LIMITS.ITEM_MAX_LENGTH);
+    replyToLine(replyToken, [errorMessage]);
     return;
   }
+
   state.step = MODIFICATION_FLOW.STEPS.WAITING_FOR_NOTE;
-  if (newItem !== MESSAGES.common.skip_command) {
+  if (newItem !== 'スキップ') {
     state.newItem = newItem;
   }
   cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
-  replyToLine(replyToken, [getModificationNotePromptMessage()]);
+  replyToLine(replyToken, [getModificationNotePromptMessage(state.currentNote)]);
 }
 
 /**
- * [対話] メモ入力の処理
+ * 予定変更フロー：メモ入力の処理
  * @private
  */
-function handleNoteInput_(replyToken, userId, newNote, state, cache) {
-  if (newNote !== MESSAGES.common.skip_command && newNote !== MESSAGES.common.none_command && newNote.length > VALIDATION_LIMITS.NOTE_MAX_LENGTH) {
-    const text = formatMessage(MESSAGES.modification.noteTooLong, VALIDATION_LIMITS.NOTE_MAX_LENGTH);
-    replyToLine(replyToken, [{ type: 'text', text: text }]);
+function _handleNoteInput(replyToken, userId, newNote, state, cache) {
+  if (newNote !== 'スキップ' && newNote !== 'なし' && newNote.length > VALIDATION_LIMITS.NOTE_MAX_LENGTH) {
+    const errorMessage = getModificationNotePromptMessage(state.currentNote);
+    errorMessage.text = formatMessage(MESSAGES.modification.noteTooLong, VALIDATION_LIMITS.NOTE_MAX_LENGTH);
+    replyToLine(replyToken, [errorMessage]);
     return;
   }
 
   const finalItem = state.newItem || state.currentItem;
   let finalNote = state.currentNote;
-  if (newNote !== MESSAGES.common.skip_command) {
-    finalNote = (newNote === MESSAGES.common.none_command) ? '-' : newNote;
+  if (newNote !== 'スキップ') {
+    finalNote = (newNote === 'なし') ? '-' : newNote;
   }
 
-  const success = updateSchedule(userId, state.day, sanitizeInput_(finalItem), sanitizeInput_(finalNote));
+  const sanitizedItem = _sanitizeInput(finalItem);
+  const sanitizedNote = _sanitizeInput(finalNote);
+  const success = updateSchedule(userId, state.day, sanitizedItem, sanitizedNote);
   cache.remove(userId);
 
   if (success) {
-    const altText = formatMessage(MESSAGES.modification.altText, state.day, finalItem);
-    const flexMessage = createSingleDayFlexMessage(MESSAGES.modification.success_title, state.day, finalItem, finalNote, altText, true);
+    const title = '✅ 予定を更新しました';
+    const altText = `【${state.day}】の予定を「${finalItem}」に更新しました。`;
+    const flexMessage = createSingleDayFlexMessage(title, state.day, finalItem, finalNote, altText, true);
     replyToLine(replyToken, [flexMessage]);
   } else {
     replyToLine(replyToken, [getMenuMessage(MESSAGES.error.updateFailed)]);
   }
 }
 
-// --- リマインダー送信 ---
+// --- リマインダー送信 ---------------------------------------------------------
 
 /**
- * 全ユーザーをチェックし、設定時刻になったユーザーにリマインダーを送信します。
- * GASのトリガー（時間主導型）で定期実行します。
+ * 設定された時刻にリマインダーを送信します。（トリガー実行用）
  */
 function sendReminders() {
   try {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-    const allUsers = getAllUsers();
-    if (allUsers.length === 0) return;
+    const allUsersData = getActiveUsers();
+    if (!allUsersData || allUsersData.length === 0) {
+      return;
+    }
 
     const allSchedules = getAllSchedules();
+    if (!allSchedules) return;
 
-    allUsers.forEach(user => {
-      if (user.status !== USER_STATUS.ACTIVE) return;
+    allUsersData.forEach(userRow => {
+      const userId = userRow[COLUMNS_USER.USER_ID];
+      const userSchedules = allSchedules.filter(row => row[COLUMNS_SCHEDULE.USER_ID] === userId);
 
-      const userSchedules = allSchedules.filter(row => row[COLUMNS_SCHEDULE.USER_ID] === user.id);
+      const reminderTimeNight = userRow[COLUMNS_USER.REMINDER_TIME_NIGHT];
 
-      // 夜のリマインダー（前日通知）
-      if (isTimeToSend(now, user.nightTime)) {
+      if (_isTimeToSend(now, reminderTimeNight)) {
         const tomorrow = new Date(now);
         tomorrow.setDate(now.getDate() + 1);
-        const targetDay = WEEKDAYS_FULL[(tomorrow.getDay() + 6) % 7];
-        sendReminderForDay(user.id, targetDay, userSchedules, 'night', now);
+        const dayOfWeek = tomorrow.getDay();
+        const targetDayIndex = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+        const targetDay = WEEKDAYS_FULL[targetDayIndex];
+        _sendReminderMessage(userId, userSchedules, targetDay, 'night');
       }
 
-      // 朝のリマインダー（当日通知）
-      if (isTimeToSend(now, user.morningTime)) {
-        const targetDay = WEEKDAYS_FULL[(now.getDay() + 6) % 7];
-        sendReminderForDay(user.id, targetDay, userSchedules, 'morning', now);
+      const reminderTimeMorning = userRow[COLUMNS_USER.REMINDER_TIME_MORNING];
+
+      if (_isTimeToSend(now, reminderTimeMorning)) {
+        const dayOfWeek = now.getDay();
+        const targetDayIndex = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;
+        const targetDay = WEEKDAYS_FULL[targetDayIndex];
+        _sendReminderMessage(userId, userSchedules, targetDay, 'morning');
       }
     });
   } catch (err) {
@@ -308,48 +301,48 @@ function sendReminders() {
 }
 
 /**
- * 特定の曜日のリマインダーメッセージを送信します。
- * @param {string} userId
- * @param {string} targetDay - '月曜日'など
- * @param {Array<Array<string>>} userSchedules
- * @param {string} type - 'night' または 'morning'
+ * 現在時刻が指定された通知時刻（±トリガー間隔）であるか判定します。
+ * @private
  */
-function sendReminderForDay(userId, targetDay, userSchedules, type) {
-  const schedule = userSchedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
-  if (!schedule) return;
-
-  const item = schedule[COLUMNS_SCHEDULE.GARBAGE_TYPE];
-  const note = schedule[COLUMNS_SCHEDULE.NOTES];
-
-  let title, dayText, altText;
-  if (type === 'night') {
-    title = MESSAGES.reminder.title_night;
-    dayText = formatMessage(MESSAGES.reminder.day_tomorrow, targetDay);
-    altText = formatMessage(MESSAGES.reminder.altText_tomorrow, item);
-  } else {
-    title = MESSAGES.reminder.title_morning;
-    dayText = formatMessage(MESSAGES.reminder.day_today, targetDay);
-    altText = formatMessage(MESSAGES.reminder.altText_today, item);
-  }
-
-  const flexMessage = createSingleDayFlexMessage(title, dayText, item, note, altText, true);
-  pushToLine(userId, [flexMessage]);
-  writeLog('INFO', `${type}リマインダー送信`, userId);
-}
-
-/**
- * 現在時刻が指定された時刻の通知タイミングかどうかを判定します。
- * @param {Date} now - 現在時刻のDateオブジェクト
- * @param {string} timeString - 'HH:mm'形式の時刻文字列
- * @returns {boolean} 通知タイミングであればtrue
- */
-function isTimeToSend(now, timeString) {
-  if (typeof timeString !== 'string' || !/^\d{2}:\d{2}$/.test(timeString)) {
+function _isTimeToSend(now, timeString) {
+  if (typeof timeString !== 'string' || !/^\d{1,2}:\d{2}$/.test(timeString)) {
     return false;
   }
   const [hour, minute] = timeString.split(':');
   const targetDate = new Date(now);
   targetDate.setHours(parseInt(hour, 10), parseInt(minute, 10), 0, 0);
+  
   const timeDiff = now.getTime() - targetDate.getTime();
-  return timeDiff >= 0 && timeDiff < TRIGGER_INTERVAL_MINUTES * 60 * 1000;
+  const shouldSend = timeDiff >= 0 && timeDiff < TRIGGER_INTERVAL_MINUTES * 60 * 1000;
+
+  return shouldSend;
+}
+
+/**
+ * リマインダーメッセージを送信するヘルパー関数
+ * @private
+ */
+function _sendReminderMessage(userId, userSchedules, targetDay, type) {
+  const schedule = userSchedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
+  if (!schedule) {
+    return;
+  }
+
+  const item = schedule[COLUMNS_SCHEDULE.GARBAGE_TYPE];
+  const note = schedule[COLUMNS_SCHEDULE.NOTES];
+  
+  let title, dayText;
+  if (type === 'night') {
+    title = 'リマインダー🔔 (夜)';
+    dayText = `明日のごみ (${targetDay})`;
+  } else {
+    title = 'リマインダー☀️ (朝)';
+    dayText = `今日のごみ (${targetDay})`;
+  }
+
+  const altText = `【リマインダー】${dayText.split(' ')[0]}のごみは「${item}」です。`;
+  const flexMessage = createSingleDayFlexMessage(title, dayText, item, note, altText, true);
+  
+  pushToLine(userId, [flexMessage]);
+  writeLog('INFO', `${type === 'night' ? '夜' : '朝'}リマインダー送信`, userId);
 }

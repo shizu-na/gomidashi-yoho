@@ -1,104 +1,209 @@
+// flex_messages.js
+
 /**
  * @fileoverview LINE Flex MessageのJSONオブジェクトを生成するための関数群です。
  */
 
-/**
- * 使い方ガイドのFlex Messageを返します。
- * @returns {object} Flex Messageオブジェクト
- */
 function getHelpFlexMessage() {
   return {
     type: "flex",
     altText: MESSAGES.flex.helpAltText,
-    contents: helpMessageContents
+    contents: helpMessageContents,
   };
 }
 
-/**
- * 全曜日のスケジュール一覧カルーセルを作成します。
- * @param {string} userId - ユーザーID
- * @returns {object} Flex Messageオブジェクトまたはテキストメッセージオブジェクト
- */
 function createScheduleFlexMessage(userId) {
-  const schedules = getSchedulesByUserId(userId);
-  if (schedules.length === 0) {
+  const data = getSchedulesByUserId(userId);
+
+  if (data.length === 0) {
     return getMenuMessage(MESSAGES.query.sheetEmpty);
   }
 
-  // WEEKDAYS_FULLの順序でソート
-  const sortedSchedules = schedules.sort((a, b) =>
-    WEEKDAYS_FULL.indexOf(a[COLUMNS_SCHEDULE.DAY_OF_WEEK]) - WEEKDAYS_FULL.indexOf(b[COLUMNS_SCHEDULE.DAY_OF_WEEK])
+  const sortedData = data.sort(
+    (a, b) =>
+      WEEKDAYS_FULL.indexOf(a[COLUMNS_SCHEDULE.DAY_OF_WEEK]) -
+      WEEKDAYS_FULL.indexOf(b[COLUMNS_SCHEDULE.DAY_OF_WEEK])
   );
 
-  const bubbles = sortedSchedules.map(row => {
+  const bubbles = sortedData.map((row) => {
     const day = row[COLUMNS_SCHEDULE.DAY_OF_WEEK];
-    const item = row[COLUMNS_SCHEDULE.GARBAGE_TYPE] || SCHEDULE_DEFAULTS.ITEM;
-    const note = row[COLUMNS_SCHEDULE.NOTES];
+    const item = row[COLUMNS_SCHEDULE.GARBAGE_TYPE] || "（未設定）";
+    const note = row[COLUMNS_SCHEDULE.NOTES] || "";
 
-    const bodyContents = [{ type: "text", text: item, wrap: true, weight: "bold", size: "md" }];
-    
-    if (note && note !== SCHEDULE_DEFAULTS.NOTE) {
+    const bodyContents = [
+      {
+        type: "text",
+        text: item,
+        wrap: true,
+        weight: "bold",
+        size: "md",
+      },
+    ];
+
+    if (note && note !== "-") {
       bodyContents.push({ type: "separator", margin: "lg" });
-      bodyContents.push({ type: "text", text: note, wrap: true, size: "sm", color: "#666666" });
+      bodyContents.push({
+        type: "text",
+        text: note,
+        wrap: true,
+        size: "sm",
+        color: "#666666",
+      });
     }
 
     return {
-      type: "bubble", size: "nano",
-      header: { type: "box", layout: "vertical", contents: [{ type: "text", text: day.replace('曜日', ''), weight: "bold", size: "xl", color: "#176FB8", align: "center" }], paddingAll: "10px", backgroundColor: "#f0f8ff" },
-      body: { type: "box", layout: "vertical", spacing: "md", contents: bodyContents },
-      action: { type: "postback", label: "変更", data: `action=startChange&day=${day}` }
+      type: "bubble",
+      size: "nano",
+      header: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: day.replace("曜日", ""),
+            weight: "bold",
+            size: "xl",
+            color: "#176FB8",
+            align: "center",
+          },
+        ],
+        paddingAll: "10px",
+        backgroundColor: "#f0f8ff",
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        contents: bodyContents,
+      },
+      action: {
+        type: "postback",
+        label: "変更",
+        data: `action=startChange&day=${day}`,
+      },
     };
   });
 
-  return { type: "flex", altText: MESSAGES.flex.scheduleAltText, contents: { type: "carousel", contents: bubbles } };
-}
-
-/**
- * 利用規約同意のFlex Messageを返します。
- * @returns {object} Flex Messageオブジェクト
- */
-function getTermsAgreementFlexMessage() {
-  return {
-    type: "flex", altText: MESSAGES.flex.termsAltText,
-    contents: {
-      type: "bubble", size: "mega",
-      header: { type: "box", layout: "vertical", contents: [ { type: "text", text: MESSAGES.flex.termsTitle, weight: "bold", color: "#FFFFFF", size: "lg", align: "center" } ], backgroundColor: "#6C757D", paddingAll: "12px" },
-      body: { type: "box", layout: "vertical", contents: [ { type: "text", text: MESSAGES.flex.termsBody, wrap: true, size: "sm", align: "center" } ], paddingAll: "15px", spacing: "md" },
-      footer: {
-        type: "box", layout: "vertical", spacing: "sm", paddingTop: "0px",
-        contents: [
-          { type: "button", action: { type: "uri", label: MESSAGES.flex.termsButtonRead, uri: TERMS_URL }, height: "sm", style: "link" },
-          { type: "separator", margin: "md" },
-          { type: "button", action: { type: "postback", label: MESSAGES.flex.termsButtonAgree, data: "action=agreeToTerms" }, style: "primary", color: "#5A9E46", height: "sm" },
-          { type: "button", action: { type: "postback", label: MESSAGES.flex.termsButtonDisagree, data: "action=disagreeToTerms" }, style: "secondary", height: "sm" }
-        ]
-      }
-    }
-  };
-}
-
-/**
- * リマインダー設定用のFlex Message（カルーセル形式）を生成します。
- * @param {string} currentNightTime - 現在の夜リマインダー時刻
- * @param {string} currentMorningTime - 現在の朝リマインダー時刻
- * @returns {object} Flex Messageオブジェクト
- */
-function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) {
-  const nightBubble = _createReminderBubble('night', MESSAGES.reminders.cardTitleNight, MESSAGES.reminders.cardDescriptionNight, currentNightTime, '21:00');
-  const morningBubble = _createReminderBubble('morning', MESSAGES.reminders.cardTitleMorning, MESSAGES.reminders.cardDescriptionMorning, currentMorningTime, '07:00');
-
   return {
     type: "flex",
-    altText: MESSAGES.flex.reminderManagementAltText,
+    altText: MESSAGES.flex.scheduleAltText,
+    contents: { type: "carousel", contents: bubbles },
+  };
+}
+
+function getTermsAgreementFlexMessage(termsUrl) {
+  return {
+    type: "flex",
+    altText: "ご利用には利用規約への同意が必要です。",
     contents: {
-      type: "carousel",
-      contents: [nightBubble, morningBubble]
+      type: "bubble",
+      size: "mega",
+      header: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: "📝 ご利用前の確認",
+            weight: "bold",
+            color: "#FFFFFF",
+            size: "lg",
+            align: "center",
+          },
+        ],
+        backgroundColor: "#6C757D",
+        paddingAll: "12px",
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: "ご利用には、利用規約・プライバシーポリシーへの同意が必要です。内容を確認し、下のボタンを選択してください。",
+            wrap: true,
+            size: "sm",
+            align: "center",
+          },
+        ],
+        paddingAll: "15px",
+        spacing: "md",
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        spacing: "sm",
+        paddingTop: "0px",
+        contents: [
+          {
+            type: "button",
+            action: { type: "uri", label: "内容を読む", uri: termsUrl },
+            height: "sm",
+            style: "link",
+          },
+          { type: "separator", margin: "md" },
+          {
+            type: "button",
+            action: {
+              type: "postback",
+              label: "同意して利用を開始する",
+              data: "action=agreeToTerms",
+            },
+            style: "primary",
+            color: "#5A9E46",
+            height: "sm",
+          },
+          {
+            type: "button",
+            action: {
+              type: "postback",
+              label: "同意しない",
+              data: "action=disagreeToTerms",
+            },
+            style: "secondary",
+            height: "sm",
+          },
+        ],
+      },
+    },
+  };
+}
+
+
+/**
+ * リマインダー設定・管理用のFlex Message（カルーセル形式）を生成します。
+ * @param {string} currentNightTime - 現在設定されている夜のリマインダー時刻 ("HH:mm" or "")
+ * @param {string} currentMorningTime - 現在設定されている朝のリマインダー時刻 ("HH:mm" or "")
+ * @returns {object} LINE送信用Flex Messageオブジェクト
+ */
+function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) {
+  const nightBubble = _createReminderBubble(
+    'night',
+    '夜のリマインダー 🌙',
+    '前日の夜に、翌日のごみ出し予定を通知します。',
+    currentNightTime,
+    '21:00'
+  );
+  const morningBubble = _createReminderBubble(
+    'morning',
+    '朝のリマインダー ☀️',
+    '当日の朝に、今日のごみ出し予定を通知します。',
+    currentMorningTime,
+    '07:00'
+  );
+
+  return {
+    "type": "flex",
+    "altText": "リマインダー設定",
+    "contents": {
+      "type": "carousel",
+      "contents": [nightBubble, morningBubble]
     }
   };
 }
 
 /**
- * リマインダー設定カード（バブル）を生成する内部ヘルパー関数。
+ * リマインダー設定用バブルを1つ生成するヘルパー関数
  * @private
  */
 function _createReminderBubble(type, title, description, currentTime, defaultTime) {
@@ -106,52 +211,81 @@ function _createReminderBubble(type, title, description, currentTime, defaultTim
   const timePickerInitial = _formatTimeForPicker(currentTime, defaultTime);
 
   return {
-    type: "bubble", size: "mega",
-    header: { type: "box", layout: "vertical", contents: [ { type: "text", text: `⚙️ ${title}`, weight: "bold", color: "#FFFFFF", size: "lg", align: "center" } ], backgroundColor: "#176FB8", paddingAll: "12px" },
-    body: { type: "box", layout: "vertical", paddingAll: "15px", spacing: "lg", contents: [ { type: "box", layout: "vertical", spacing: "none", contents: [ { type: "text", text: "現在の通知時刻", size: "sm", align: "center", color: "#AAAAAA" }, { type: "text", text: timeDisplayText, weight: "bold", size: "xxl", align: "center", color: "#333333" } ] }, { type: "text", text: description, wrap: true, size: "sm", align: "center", color: "#555555" } ] },
-    footer: { type: "box", layout: "vertical", spacing: "sm", contents: [
-      { type: "button", action: { type: "datetimepicker", label: "時刻を変更・設定する", data: `action=setReminderTime&type=${type}`, mode: "time", initial: timePickerInitial }, style: "primary", height: "sm", color: "#176FB8" },
-      { type: "button", action: { type: "postback", label: "リマインダーを停止する", data: `action=stopReminder&type=${type}` }, style: "secondary", height: "sm" },
-      { type: "separator", margin: "md" },
-      { type: "text", text: MESSAGES.reminders.cardNote, size: "xxs", color: "#aaaaaa", align: "center", wrap: true, margin: "md"}
+    "type": "bubble", "size": "mega",
+    "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": `⚙️ ${title}`, "weight": "bold", "color": "#FFFFFF", "size": "lg", "align": "center" } ], "backgroundColor": "#176FB8", "paddingAll": "12px" },
+    "body": { "type": "box", "layout": "vertical", "paddingAll": "15px", "spacing": "lg", "contents": [ { "type": "box", "layout": "vertical", "spacing": "none", "contents": [ { "type": "text", "text": "現在の通知時刻", "size": "sm", "align": "center", "color": "#AAAAAA" }, { "type": "text", "text": timeDisplayText, "weight": "bold", "size": "xxl", "align": "center", "color": "#333333" } ] }, { "type": "text", "text": description, "wrap": true, "size": "sm", "align": "center", "color": "#555555" } ] },
+    "footer": { "type": "box", "layout": "vertical", "spacing": "sm", "contents": [
+      { "type": "button", "action": { "type": "datetimepicker", "label": "時刻を変更・設定する", "data": `action=setReminderTime&type=${type}`, "mode": "time", "initial": timePickerInitial }, "style": "primary", "height": "sm", "color": "#176FB8" },
+      { "type": "button", "action": { "type": "postback", "label": "リマインダーを停止する", "data": `action=stopReminder&type=${type}` }, "style": "secondary", "height": "sm" },
+      { "type": "separator", "margin": "md" },
+      { "type": "text", "text": "※仕様上、通知が最大5分ほどずれる場合があります。", "size": "xxs", "color": "#aaaaaa", "align": "center", "wrap": true, "margin": "md"}
     ] }
   };
 }
 
 /**
- * 時刻文字列を datetimepicker用の 'HH:mm' 形式に整形する内部ヘルパー関数。
+ * LINEのdatetimepicker用に時刻文字列を "HH:mm" 形式に整形するヘルパー関数
  * @private
  */
 function _formatTimeForPicker(timeString, defaultTime) {
   const targetTime = timeString || defaultTime;
-  if (typeof targetTime !== 'string' || targetTime.split(':').length !== 2) {
-    return defaultTime;
-  }
-  const [hour, minute] = targetTime.split(':');
-  return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  if (typeof targetTime !== 'string') return defaultTime;
+
+  const parts = targetTime.split(':');
+  if (parts.length !== 2) return defaultTime;
+
+  const hour = parts[0].padStart(2, '0');
+  const minute = parts[1].padStart(2, '0');
+  return `${hour}:${minute}`;
 }
 
+
 /**
- * 単日のごみ出し情報を表示するFlex Messageを生成します。
- * @param {string} title - ヘッダータイトル
- * @param {string} day - 曜日
- * @param {string} item - 品目
+ * 単日のごみ出し情報を表示するためのFlex Message（バブル形式）を生成します。
+ * @param {string} title - ヘッダーに表示するタイトル
+ * @param {string} day - 対象の曜日
+ * @param {string} item - ごみの品目
  * @param {string} note - メモ
  * @param {string} altText - 代替テキスト
- * @param {boolean} withQuickReply - クイックリプライを付与するか
- * @returns {object} LINE送信用メッセージオブジェクト
+ * @param {boolean} [withQuickReply=false] - クイックメッセージを付与するかどうか
+ * @returns {object} LINE送信用Flex Messageオブジェクト
  */
 function createSingleDayFlexMessage(title, day, item, note, altText, withQuickReply = false) {
-  const bodyContents = [{ type: "text", text: item || SCHEDULE_DEFAULTS.ITEM, wrap: true, weight: "bold", size: "xl", margin: "md" }];
+  const bodyContents = [
+    {
+      type: "text",
+      text: item || "（未設定）",
+      wrap: true,
+      weight: "bold",
+      size: "xl",
+      margin: "md",
+    },
+  ];
 
-  if (note && note !== SCHEDULE_DEFAULTS.NOTE) {
+  if (note && note !== "-") {
     bodyContents.push({ type: "separator", margin: "xl" });
     bodyContents.push({
-      type: "box", layout: "vertical", margin: "lg", spacing: "sm",
+      type: "box",
+      layout: "vertical",
+      margin: "lg",
+      spacing: "sm",
       contents: [
-        { type: "text", text: "メモ", color: "#aaaaaa", size: "sm", flex: 1 },
-        { type: "text", text: note, wrap: true, size: "sm", color: "#666666", flex: 5 }
-      ]
+        {
+          type: "text",
+          text: "メモ",
+          color: "#aaaaaa",
+          size: "sm",
+          flex: 1,
+        },
+        {
+          type: "text",
+          text: note,
+          wrap: true,
+          size: "sm",
+          color: "#666666",
+          flex: 5,
+        },
+      ],
     });
   }
 
@@ -159,16 +293,43 @@ function createSingleDayFlexMessage(title, day, item, note, altText, withQuickRe
     type: "flex",
     altText: altText,
     contents: {
-      type: "bubble", size: "kilo",
-      header: { type: "box", layout: "vertical", paddingAll: "12px", backgroundColor: "#176FB8", contents: [ { type: "text", text: title, color: "#ffffff", size: "md", weight: "bold" }, { type: "text", text: day, color: "#ffffff", size: "xl", weight: "bold", margin: "sm" } ] },
-      body: { type: "box", layout: "vertical", spacing: "md", contents: bodyContents }
-    }
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        paddingAll: "12px",
+        backgroundColor: "#176FB8",
+        contents: [
+          {
+            type: "text",
+            text: title,
+            color: "#ffffff",
+            size: "md",
+            weight: "bold",
+          },
+          {
+            type: "text",
+            text: day,
+            color: "#ffffff",
+            size: "xl",
+            weight: "bold",
+            margin: "sm",
+          },
+        ],
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        contents: bodyContents,
+      },
+    },
   };
   
   if (withQuickReply) {
-    flexMessage.quickReply = QUICK_REPLY_ITEMS;
+    flexMessage.quickReply = QUICK_REPLIES.DEFAULT;
   }
-  
   return flexMessage;
 }
 
