@@ -80,25 +80,28 @@ function handleFollowEvent(event) {
  * @param {object} event - LINE Webhookイベントオブジェクト
  */
 function handlePostback(event) {
-  const lock = LockService.getUserLock();
-  if (!lock.tryLock(5000)) {
-    writeLog('INFO', 'ボタンの連続タップにより処理をスキップしました。', event.source.userId);
-    return;
-  }
-
   try {
     const { replyToken, source: { userId }, postback } = event;
     const params = _parseQueryString(postback.data);
     const action = params.action;
 
     switch (action) {
-      case 'agreeToTerms':
-        // (省略)
+      case 'agreeToTerms': {
+        const userRecord = getUserRecord(userId);
+        if (userRecord && userRecord.status === USER_STATUS.ACTIVE) {
+          replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.already_active)]);
+          return;
+        }
+        createNewUser(userId);
+        writeLog('INFO', '新規ユーザー登録完了', userId);
+        replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.agreed)]);
         break;
+      }
 
-      case 'disagreeToTerms':
-        // (省略)
+      case 'disagreeToTerms': {
+        replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.disagreed }]);
         break;
+      }
 
       case 'setReminderTime': {
         const selectedTime = postback.params.time;
@@ -129,8 +132,6 @@ function handlePostback(event) {
     }
   } catch (err) {
     writeLog('ERROR', `handlePostback処理中にエラー: ${err.stack}`, event.source.userId);
-  } finally {
-    lock.releaseLock();
   }
 }
 
@@ -144,11 +145,6 @@ function handleMessage(event) {
   }
 
   const userId = event.source.userId;
-  const lock = LockService.getUserLock();
-  if (!lock.tryLock(5000)) {
-    writeLog('INFO', 'メッセージの連続送信により処理をスキップしました。', userId);
-    return;
-  }
 
   try {
     const { replyToken, message: { text: userMessage } } = event;
@@ -187,8 +183,6 @@ function handleMessage(event) {
     }
   } catch (err) {
     writeLog('ERROR', `handleMessage処理中にエラー: ${err.stack}`, userId);
-  } finally {
-    lock.releaseLock();
   }
 }
 
