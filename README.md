@@ -34,49 +34,77 @@ Googleスプレッドシートをデータベースとして活用する、個�
 
 ## セットアップ
 
-### 1. LINE Developers Consoleでの設定
+### 1. プロジェクトの準備
+
+ローカル環境にプロジェクトをクローンし、`clasp`をセットアップします。
+
+```bash
+# 1. リポジトリをクローン
+git clone https://github.com/shizu-na/gomidashi-yoho.git
+cd gomidashi-yoho
+
+# 2. 依存関係をインストール
+npm install
+
+# 3. claspでGoogleにログイン（初回のみ）
+npx clasp login
+````
+
+### 2. LINE Developers Consoleでの設定
 
 * プロバイダーとMessaging APIチャネルを新規作成します。
 * `チャネルアクセストークン（長期）` を取得します。
 
-### 2. Google Sheetsの準備
+### 3. Google Sheets & GASプロジェクトの準備
 
-* 新規にGoogleスプレッドシートを作成し、`スプレッドシートID`を控えます。
-* 以下の3つのシートを作成し、1行目に指定のヘッダーを設置します。
+* **Google Sheets:**
 
-| シート名 | A列 | B列 | C列 | D列 | E列 | F列 | G列 |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Users** | userId | status | createdAt | updatedAt | reminderTimeNight | reminderTimeMorning | conversationState |
-| **Schedules**| userId | dayOfWeek | itemName | notes | | | |
-| **Allowlist**| userId | | | | | | |
+  * 新規にGoogleスプレッドシートを作成し、`スプレッドシートID`を控えます。
+  * 以下の3つのシートを作成し、1行目に指定のヘッダーを設置します。
 
-* **`Allowlist`シートのA2セルに、ご自身のLINEユーザーIDを登録します。**
-  * *Note: 自身のユーザーIDは、Botと友だちになった後に何かメッセージを送ると、ログ用スプレッドシートに記録される`ownerId`から確認できます。*
+    * **Users**: `userId`, `status`, `createdAt`, `updatedAt`, `reminderTimeNight`, `reminderTimeMorning`, `conversationState`
+    * **Schedules**: `userId`, `dayOfWeek`, `itemName`, `notes`
+    * **Allowlist**: `userId`
+  * 作成した`Allowlist`シートのA2セルに、ご自身のLINEユーザーIDを登録します。
 
-### 3. スクリプトプロパティの設定
+* **Google Apps Script:**
 
-* GASプロジェクトを新規作成し、リポジトリのコードを各ファイルにコピー＆ペーストします。
-* 推測されにくい**秘密トークン**（例: `openssl rand -hex 32` などで生成）を準備します。
-* `ファイル > プロジェクトの設定 > スクリプト プロパティ` に、以下のキーと値を設定します。
+  * 新規にスタンドアロン型のGASプロジェクトを作成します。
+  * `設定 > 全般設定` ページで表示される `スクリプトID` をコピーします。
+  * ローカルの`.clasp.json`ファイルを開き、`scriptId`の値を上記でコピーしたものに書き換えます。
 
-| キー | 値 |
-| :--- | :--- |
-| `LINE_CHANNEL_ACCESS_TOKEN`| 手順1で取得したトークン |
-| `SECRET_TOKEN` | 上記で準備した秘密トークン |
-| `DATABASE_SHEET_ID` | 手順2で控えたスプレッドシートID |
-| `LOG_ID` | （任意）ログ記録用の別スプレッドシートのID |
+### 4. スクリプトプロパティの設定
 
-* Note: *`LOG_ID`を指定した場合、Botは操作ログを記録します。`Log_YYYY-MM`という名前のシートが自動作成され、ヘッダーとして `Timestamp`, `LogLevel`, `Message`, `OwnerID` が設定されます。*
+* GASプロジェクトの `プロジェクト設定 > スクリプト プロパティ` に、以下のキーと値を設定します。
+* **秘密トークン**は、`openssl rand -hex 32` 等で生成した推測されにくい文字列を使用してください。
 
-### 4. デプロイとWebhook設定
+| キー                          | 値                      |
+| :-------------------------- | :--------------------- |
+| `LINE_CHANNEL_ACCESS_TOKEN` | 手順2で取得したトークン           |
+| `SECRET_TOKEN`              | 上記で準備した秘密トークン          |
+| `DATABASE_SHEET_ID`         | 手順3で控えたスプレッドシートID      |
+| `LOG_ID`                    | （任意）ログ記録用の別スプレッドシートのID |
 
-* GASプロジェクトを「ウェブアプリ」としてデプロイし、ウェブアプリURLを取得します。
+*Note: `LOG_ID`を指定した場合、`Log_YYYY-MM`という名前のシートが自動作成され、ヘッダーとして `Timestamp`, `LogLevel`, `Message`, `OwnerID` が設定されます。*
+
+### 5. デプロイとWebhook設定
+
+* ローカルのターミナルから、以下のコマンドでGASにコードをプッシュします。
+
+```bash
+npx clasp push
+```
+
+* GASエディタ上で「デプロイ > 新しいデプロイ」を選択し、「ウェブアプリ」としてデプロイします。
+  **このとき、「次のユーザーとしてアプリを実行」を「自分」、「アクセスできるユーザー」を「全員」に設定してください。**
+* デプロイが完了したら、ウェブアプリURLをコピーします。
 * LINE Developers ConsoleのWebhook設定に、`【ウェブアプリURL】?token=【秘密トークン】` の形式でURLを貼り付け、「Webhookの利用」をオンにします。
 
-### 5. トリガーの設定
+### 6. トリガーの設定
 
-* GASエディタの左メニュー「トリガー」から、`sendReminders`関数を定期実行するためのトリガーを新規作成します。
+* GASエディタの「トリガー」から、`sendReminders`関数を定期実行するためのトリガーを新規作成します。
 * 推奨設定は以下の通りです。
+
   * イベントのソース: `時間主導型`
   * 時間ベースのタイマー: `分ベースのタイマー`
   * 時間の間隔: `5分ごと`
