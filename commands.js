@@ -93,7 +93,11 @@ function _handleReminder(userId) {
 function _handleScheduleList(userId) {
   const carouselMessage = createScheduleFlexMessage(userId);
   if (carouselMessage && carouselMessage.type === 'flex') {
-    const promptMessage = { type: 'text', text: MESSAGES.flex.schedulePrompt };
+    const promptMessage = {
+      type: 'text',
+      text: MESSAGES.flex.schedulePrompt,
+      quickReply: QUICK_REPLIES.DEFAULT
+    };
     return [carouselMessage, promptMessage];
   }
   // スケジュール未登録などの場合は、単一のメッセージオブジェクトが返る

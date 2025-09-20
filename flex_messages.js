@@ -198,7 +198,8 @@ function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) 
     "contents": {
       "type": "carousel",
       "contents": [nightBubble, morningBubble]
-    }
+    },
+    "quickReply": QUICK_REPLIES.DEFAULT
   };
 }
 

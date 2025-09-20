@@ -84,12 +84,10 @@ const QUICK_REPLIES = {
   MODIFICATION_NOTE: {
     'items': [
       { 'type': 'action', 'action': { 'type': 'message', 'label': 'スキップ', 'text': 'スキップ' } },
-      { 'type': 'action', 'action': { 'type': 'message', 'label': 'なし', 'text': 'なし' } },
       { 'type': 'action', 'action': { 'type': 'message', 'label': 'キャンセル', 'text': 'キャンセル' } }
     ]
   }
 };
-
 
 /**
  * メッセージ内のプレースホルダを置換します。 (例: {0}, {1})

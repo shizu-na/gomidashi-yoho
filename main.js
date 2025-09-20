@@ -87,16 +87,25 @@ function handlePostback(event) {
     
     const userRecord = getUserRecord(userId);
 
-    // ▼▼▼ 変更点：ifの条件をシンプルにしました ▼▼▼
     // ユーザーが対話中であれば、いかなるボタン操作もブロックする
     if (userRecord && userRecord.conversationState) {
-      replyToLine(replyToken, [{
+      const state = JSON.parse(userRecord.conversationState);
+      
+      const blockingMessage = {
         type: 'text',
         text: '現在、予定の変更手続き中です。先にそちらを完了するか、「キャンセル」と入力して中断してください。'
-      }]);
+      };
+      
+      let repromptMessage;
+      if (state.step === MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM) {
+        repromptMessage = getModificationItemPromptMessage(state.day, state.currentItem);
+      } else if (state.step === MODIFICATION_FLOW.STEPS.WAITING_FOR_NOTE) {
+        repromptMessage = getModificationNotePromptMessage(state.currentNote);
+      }
+      
+      replyToLine(replyToken, [blockingMessage, repromptMessage]);
       return;
     }
-    // ▲▲▲ 変更ここまで ▲▲▲
 
     switch (action) {
       case 'agreeToTerms': {
@@ -121,7 +130,7 @@ function handlePostback(event) {
         updateReminderTime(userId, selectedTime, type);
 
         const typeText = (type === 'night') ? '夜' : '朝';
-        const replyText = `✅ 承知いたしました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
+        const replyText = `✅ 変更いたしました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
         replyToLine(replyToken, [getMenuMessage(replyText)]);
         break;
       }
