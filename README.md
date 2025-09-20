@@ -66,7 +66,7 @@ Googleスプレッドシートをデータベースとして活用する、個�
 | `DATABASE_SHEET_ID` | 手順2で控えたスプレッドシートID |
 | `LOG_ID` | （任意）ログ記録用の別スプレッドシートのID |
 
-* Note: `LOG_ID`を指定した場合、Botは操作ログを記録します。`Log_YYYY-MM`という名前のシートが自動作成され、ヘッダーとして `Timestamp`, `LogLevel`, `Message`, `OwnerID` が設定されます。
+* Note: *`LOG_ID`を指定した場合、Botは操作ログを記録します。`Log_YYYY-MM`という名前のシートが自動作成され、ヘッダーとして `Timestamp`, `LogLevel`, `Message`, `OwnerID` が設定されます。*
 
 ### 4. デプロイとWebhook設定
 
