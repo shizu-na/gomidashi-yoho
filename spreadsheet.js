@@ -37,11 +37,14 @@ function getUserRecord(userId) {
     const range = sheet.getRange("A:A").createTextFinder(userId).matchEntireCell(true).findNext();
     if (range) {
       const rowNum = range.getRow();
-      const values = sheet.getRange(rowNum, COLUMNS_USER.STATUS + 1, 1, 2).getValues()[0];
+      // ▼▼▼ 変更点：status列とconversationState列を個別に取得する ▼▼▼
+      const status = sheet.getRange(rowNum, COLUMNS_USER.STATUS + 1).getValue();
+      const conversationState = sheet.getRange(rowNum, COLUMNS_USER.CONVERSATION_STATE + 1).getValue();
+      
       return {
         row: rowNum,
-        status: values[0],
-        conversationState: values[1]
+        status: status,
+        conversationState: conversationState
       };
     }
     return null;
