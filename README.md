@@ -98,30 +98,28 @@ function runMyTest() {
 
 ## コーディングスタイル
 
-このプロジェクトでは、特に`flex_messages.js`におけるコードの可読性を高めるため、以下のスタイルガイドを適用します。
+このプロジェクトでは、特に`flex_messages.js`におけるコードの可読性と一貫性を高めるため、以下のスタイルガイドを適用します。
 
-### 1. 引数と`options`の分離
+### 1. `(options, content)` の引数順
 
-ビルダー関数を呼び出す際、必須引数と`options`オブジェクトの間で改行を入れ、内容（What）と装飾（How）を視覚的に分離します。
+すべてのビルダー関数は、第一引数に装飾や設定を担う`options`オブジェクトを、第二引数に表示内容や子要素を担う`content`を受け取ります。これにより、関数シグネチャが統一され、予測可能なコードになります。
 
-```javascript
-Text(
-  "こんにちは",       // 内容
-  { size: "sm" }    // 装飾
-)
-```
+`options`が不要な場合は、空のオブジェクト`{}`を渡します。
 
-### 2. `contents`の縦並び
+### 2. 宣言的なフォーマット
 
-`Box`や`Carousel`の`contents`配列は、UIの構造とコードの構造を一致させるため、たとえ要素が1つであっても、常に各要素を改行して縦に並べます。
+関数呼び出しは、UIの構造とコードの構造を一致させるため、改行を積極的に用いて記述します。
 
 ```javascript
+// 書き方の例
 Box(
-  [
-    Text("1行目"),
-    Text("2行目")
-  ],
-  { spacing: "md" }
+  { backgroundColor: "#FFFFFF", paddingAll: "lg" }, // Boxのoptions
+  [ // Boxのcontent (配列)
+    Text(
+      { size: "sm" }, // Textのoptions
+      "こんにちは"       // Textのcontent
+    )
+  ]
 )
 ```
 
