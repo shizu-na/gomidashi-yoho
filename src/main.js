@@ -91,7 +91,7 @@ function handlePostback(event) {
         const type = params.type;
         updateReminderTime(userId, selectedTime, type);
         const typeText = (type === 'night') ? '夜' : '朝';
-        const replyText = `✅ 承知いたしました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
+        const replyText = `✅ 設定しました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
         replyToLine(replyToken, [getMenuMessage(replyText)]);
         break;
       }

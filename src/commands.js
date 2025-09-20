@@ -17,8 +17,8 @@ const COMMAND_MAP = new Map([
   [/^退会$/, _handleUnregistration],
 
   // --- パターンマッチコマンド (MessageAction由来) ---
-  [/^変更\s(月|火|水|木|金|土|日)曜日$/, _handleChangeCommand],
-  [/^停止\s(夜|朝)$/, _handleStopReminderCommand],
+  [/^(月|火|水|木|金|土|日)曜日の変更$/, _handleChangeCommand],
+  [/^(夜|朝)のリマインドを停止$/, _handleStopReminderCommand],
   [/^利用規約に同意する$/, _handleAgreeToTermsCommand],
   [/^利用規約に同意しない$/, _handleDisagreeToTermsCommand],
 ]);
@@ -308,14 +308,14 @@ function _sendReminderMessage(userId, userSchedules, targetDay, type) {
   
   let title, dayText;
   if (type === 'night') {
-    title = 'リマインダー🔔 (夜)';
+    title = '夜のリマインダー🔔';
     dayText = `明日のごみ (${targetDay})`;
   } else {
-    title = 'リマインダー☀️ (朝)';
+    title = '朝のリマインダー☀️';
     dayText = `今日のごみ (${targetDay})`;
   }
 
-  const altText = `【リマインダー】${dayText.split(' ')[0]}のごみは「${item}」です。`;
+  const altText = `【リマインダー】${dayText.split(' ')[0]}は「${item}」です。`;
   const flexMessage = createSingleDayFlexMessage(title, dayText, item, note, altText, true);
   
   pushToLine(userId, [flexMessage]);

@@ -174,11 +174,11 @@ function getHelpFlexMessage() {
           [
             Text(
               { wrap: true, size: "sm", align: "center" },
-              "1週間の予定をカード形式で表示。"
+              "1週間の予定を一覧で表示"
             ),
             Text(
               { margin: "none", wrap: true, size: "sm", align: "center", weight: "bold" },
-              "そのカードをタップすると\n予定を編集できます。"
+              "曜日をタップすると\n予定を編集できます。"
             )
           ]
         ),
@@ -210,7 +210,7 @@ function getHelpFlexMessage() {
           [
             Text(
               { wrap: true, size: "sm", align: "center" },
-              "今日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。"
+              "今日のごみ出し予定と\n登録したメモを\nすぐに確認できます。"
             )
           ]
         ),
@@ -242,7 +242,7 @@ function getHelpFlexMessage() {
           [
             Text(
               { wrap: true, size: "sm", align: "center" },
-              "明日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。"
+              "明日のごみ出し予定と\n登録したメモを\nすぐに確認できます。"
             )
           ]
         ),
@@ -274,7 +274,7 @@ function getHelpFlexMessage() {
           [
             Text(
               { wrap: true, size: "sm", align: "center" },
-              "「前日の夜」と「当日の朝」、\n2つのタイミングでごみ出しを\nリマインドできます。"
+              "前日の夜と当日の朝の\nタイミングでごみ出しを\nリマインドできます。"
             )
           ]
         ),
@@ -306,7 +306,7 @@ function getHelpFlexMessage() {
           [
             Text(
               { wrap: true, size: "sm", align: "center" },
-              "利用を停止します。\nデータは一時的に保持され、\nいつでも利用を再開できます。"
+              "利用を停止します。\nデータは一時的に保持され\nいつでも再開できます。"
             )
           ]
         ),
@@ -365,7 +365,7 @@ function createScheduleFlexMessage(userId) {
       {
         size: "nano",
         // ▼▼▼ PostbackAction → MessageAction に変更 ▼▼▼
-        action: MessageAction("変更", `変更 ${day}`)
+        action: MessageAction("変更", `${day}の変更`)
       },
       {
         header: Box(
@@ -432,12 +432,45 @@ function getTermsAgreementFlexMessage(termsUrl) {
   return FlexMessage("ご利用には利用規約への同意が必要です。", bubble);
 }
 
+// リマインダーカード用のカラーテーマ定義
+const THEME = {
+  NIGHT: {
+    headerBg: "#2c3e50", // 夜空のようなダークブルー
+    headerText: "#FFFFFF",
+    buttonBg: "#2c3e50",
+    bodyText: "#333333",
+    subtleText: "#AAAAAA",
+  },
+  MORNING: {
+    headerBg: "#3498db", // 空のようなライトブルー
+    headerText: "#FFFFFF",
+    buttonBg: "#3498db",
+    bodyText: "#333333",
+    subtleText: "#AAAAAA",
+  }
+};
+
 /**
  * リマインダー設定・管理用のFlex Messageを生成します。
  */
 function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) {
-  const nightBubble = _createReminderBubble('night', '夜のリマインダー 🌙', '前日の夜に、翌日のごみ出し予定を通知します。', currentNightTime, '21:00');
-  const morningBubble = _createReminderBubble('morning', '朝のリマインダー ☀️', '当日の朝に、今日のごみ出し予定を通知します。', currentMorningTime, '07:00');
+  // ▼▼▼ 変更点：それぞれのバブルに、対応するテーマを渡す ▼▼▼
+  const nightBubble = _createReminderBubble(
+    'night', 
+    '夜のリマインダー 🌙', 
+    '前日の夜に、明日のごみ出しの\n予定を通知します。', 
+    currentNightTime, 
+    '21:00',
+    THEME.NIGHT // 夜用テーマ
+  );
+  const morningBubble = _createReminderBubble(
+    'morning', 
+    '朝のリマインダー ☀️', 
+    '当日の朝に、今日のごみ出しの\n予定を通知します。', 
+    currentMorningTime, 
+    '07:00',
+    THEME.MORNING // 朝用テーマ
+  );
   
   return FlexMessage(
     "リマインダー設定", 
@@ -503,38 +536,39 @@ function createSingleDayFlexMessage(title, day, item, note, altText, withQuickRe
 /**
  * リマインダー設定用バブルを1つ生成するヘルパー関数
  */
-function _createReminderBubble(type, title, description, currentTime, defaultTime) {
+function _createReminderBubble(type, title, description, currentTime, defaultTime, theme) {
   const timeDisplayText = currentTime || 'OFF';
   const timePickerInitial = _formatTimeForPicker(currentTime, defaultTime);
 
+  // ▼▼▼ 変更点：ハードコーディングされた色を、受け取ったthemeオブジェクトの値に置き換え ▼▼▼
   const header = Box(
-    { backgroundColor: "#176FB8", paddingAll: "12px" },
+    { backgroundColor: theme.headerBg, paddingAll: "12px" },
     [
       Text(
-        { weight: "bold", color: "#FFFFFF", size: "lg", align: "center" },
+        { weight: "bold", color: theme.headerText, size: "lg", align: "center" },
         `⚙️ ${title}`
       )
     ]
   );
   
   const body = Box(
-    { paddingAll: "15px", spacing: "lg" },
+    { paddingAll: "10px", spacing: "lg" },
     [
       Box(
         { spacing: "none" },
         [
           Text(
-            { size: "sm", align: "center", color: "#AAAAAA" },
+            { size: "sm", align: "center", color: theme.subtleText },
             "現在の通知時刻"
           ),
           Text(
-            { weight: "bold", size: "xxl", align: "center", color: "#333333" },
+            { weight: "bold", size: "xxl", align: "center", color: theme.bodyText },
             timeDisplayText
           )
         ]
       ),
       Text(
-        { wrap: true, size: "sm", align: "center", color: "#555555" },
+        { wrap: true, size: "sm", align: "center", color: "#555555" }, // 説明文の色は固定
         description
       )
     ]
@@ -544,16 +578,16 @@ function _createReminderBubble(type, title, description, currentTime, defaultTim
     { spacing: "sm" },
     [
       Button(
-        { style: "primary", height: "sm", color: "#176FB8" },
+        { style: "primary", height: "sm", color: theme.buttonBg },
         DatetimePickerAction("時刻を変更・設定する", `action=setReminderTime&type=${type}`, { initial: timePickerInitial, mode: "time" })
       ),
       Button(
         { style: "secondary", height: "sm" },
-        MessageAction("リマインダーを停止する", `停止 ${type === 'night' ? '夜' : '朝'}`)
+        MessageAction("リマインダーを停止する", `${type === 'night' ? '夜' : '朝'}のリマインドを停止`)
       ),
       Separator({ margin: "md" }),
       Text(
-        { size: "xxs", color: "#aaaaaa", align: "center", wrap: true, margin: "md" },
+        { size: "xxs", color: theme.subtleText, align: "center", wrap: true, margin: "md" },
         "※仕様上、通知が最大5分ほどずれる場合があります。"
       )
     ]
@@ -572,42 +606,4 @@ function _formatTimeForPicker(timeString, defaultTime) {
   }
   const [hour, minute] = timeString.split(':');
   return `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
-}
-
-/**
- * Flex Messageのテストを実行するための関数です。
- * テストしたいメッセージ生成関数をこの中で呼び出してください。
- */
-function runMyTest() {
-  // ▼▼▼ テストしたいメッセージ生成関数をここに入れる ▼▼▼
-  const messageToTest = getHelpFlexMessage();
-  // 例：
-  // const messageToTest = createSingleDayFlexMessage("テスト", "月曜日", "燃えるゴミ", "メモです", "テスト");
-  // const messageToTest = getTermsAgreementFlexMessage("https://example.com");
-
-  // テスト実行
-  _testFlexMessage(messageToTest);
-}
-
-/**
- * @typedef {object} FlexMessageObject
- * @property {string} type - 'flex'である必要があります。
- * @property {string} altText - 代替テキスト。
- * @property {object} contents - BubbleまたはCarouselオブジェクト。
- */
-
-/**
- * Flex Messageオブジェクトを受け取り、シミュレーターで使えるJSONをログに出力します。
- * この関数は直接編集せず、runMyTest()から使用してください。
- * @param {FlexMessageObject} messageObject - FlexMessage()ビルダーで生成されたオブジェクト。
- */
-function _testFlexMessage(messageObject) {
-  if (!messageObject || typeof messageObject !== 'object' || !messageObject.contents) {
-    Logger.log("テスト対象のメッセージオブジェクトが正しくありません。FlexMessage()で生成されたオブジェクトを渡してください。");
-    return;
-  }
-  
-  // ログに見やすく整形されたJSON（Simulatorにそのまま貼れる形式）を出力
-  Logger.log(JSON.stringify(messageObject.contents, null, 2));
-  console.log("✅ Flex MessageのJSONをログに出力しました。ログを開いて（Ctrl+Enter）、内容をコピーしてください。");
 }
