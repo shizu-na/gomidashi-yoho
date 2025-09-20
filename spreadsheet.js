@@ -247,7 +247,7 @@ function writeLog(level, message, ownerId = '') {
 
     if (!sheet) {
       sheet = spreadsheet.insertSheet(sheetName, 0);
-      sheet.appendRow(['タイムスタンプ', 'ログレベル', 'メッセージ', 'Owner ID']);
+      sheet.appendRow(['Timestamp', 'LogLevel', 'Message', 'OwnerID']);
     }
     sheet.appendRow([now, level, message, ownerId]);
   } catch (e) {
