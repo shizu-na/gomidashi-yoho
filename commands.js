@@ -147,12 +147,6 @@ function handleGarbageQuery(command, userId) {
 
 // --- 予定変更フロー -----------------------------------------------------------
 
-/**
- * 予定変更フローを開始します。
- * @param {string} replyToken - リプライトークン
- * @param {string} userId - ユーザーID
- * @param {string} dayToModify - 変更対象の曜日
- */
 function startModificationFlow(replyToken, userId, dayToModify) {
   const schedules = getSchedulesByUserId(userId);
   const foundRow = schedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === dayToModify);
@@ -165,48 +159,35 @@ function startModificationFlow(replyToken, userId, dayToModify) {
     currentItem: currentItem,
     currentNote: currentNote,
   };
-  const cache = CacheService.getUserCache();
-  cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
+  updateConversationState(userId, JSON.stringify(state));
 
   replyToLine(replyToken, [getModificationItemPromptMessage(dayToModify, currentItem)]);
 }
 
-/**
- * 予定変更フローの対話を継続します。
- * @param {string} replyToken - リプライトークン
- * @param {string} userId - ユーザーID
- * @param {string} userMessage - ユーザーからの入力メッセージ
- * @param {string} cachedState - キャッシュされている対話状態
- */
-function continueModification(replyToken, userId, userMessage, cachedState) {
-  const state = JSON.parse(cachedState);
-  const cache = CacheService.getUserCache();
+function continueModification(replyToken, userId, userMessage, conversationState) {
+  const state = JSON.parse(conversationState);
 
   if (userMessage === 'キャンセル') {
-    cache.remove(userId);
+    updateConversationState(userId, null);
     replyToLine(replyToken, [getMenuMessage(MESSAGES.common.cancel)]);
     return;
   }
 
   switch (state.step) {
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM:
-      _handleItemInput(replyToken, userId, userMessage, state, cache);
+      _handleItemInput(replyToken, userId, userMessage, state);
       break;
     case MODIFICATION_FLOW.STEPS.WAITING_FOR_NOTE:
-      _handleNoteInput(replyToken, userId, userMessage, state, cache);
+      _handleNoteInput(replyToken, userId, userMessage, state);
       break;
     default:
-      cache.remove(userId);
+      updateConversationState(userId, null);
       replyToLine(replyToken, [getMenuMessage(MESSAGES.error.timeout)]);
       break;
   }
 }
 
-/**
- * 予定変更フロー：品目入力の処理
- * @private
- */
-function _handleItemInput(replyToken, userId, newItem, state, cache) {
+function _handleItemInput(replyToken, userId, newItem, state) {
   if (newItem !== 'スキップ' && newItem.length > VALIDATION_LIMITS.ITEM_MAX_LENGTH) {
     const errorMessage = getModificationItemPromptMessage(state.day, state.currentItem);
     errorMessage.text = formatMessage(MESSAGES.modification.itemTooLong, VALIDATION_LIMITS.ITEM_MAX_LENGTH);
@@ -218,15 +199,11 @@ function _handleItemInput(replyToken, userId, newItem, state, cache) {
   if (newItem !== 'スキップ') {
     state.newItem = newItem;
   }
-  cache.put(userId, JSON.stringify(state), MODIFICATION_FLOW.CACHE_EXPIRATION_SECONDS);
+  updateConversationState(userId, JSON.stringify(state));
   replyToLine(replyToken, [getModificationNotePromptMessage(state.currentNote)]);
 }
 
-/**
- * 予定変更フロー：メモ入力の処理
- * @private
- */
-function _handleNoteInput(replyToken, userId, newNote, state, cache) {
+function _handleNoteInput(replyToken, userId, newNote, state) {
   if (newNote !== 'スキップ' && newNote !== 'なし' && newNote.length > VALIDATION_LIMITS.NOTE_MAX_LENGTH) {
     const errorMessage = getModificationNotePromptMessage(state.currentNote);
     errorMessage.text = formatMessage(MESSAGES.modification.noteTooLong, VALIDATION_LIMITS.NOTE_MAX_LENGTH);
@@ -243,7 +220,7 @@ function _handleNoteInput(replyToken, userId, newNote, state, cache) {
   const sanitizedItem = _sanitizeInput(finalItem);
   const sanitizedNote = _sanitizeInput(finalNote);
   const success = updateSchedule(userId, state.day, sanitizedItem, sanitizedNote);
-  cache.remove(userId);
+  updateConversationState(userId, null);
 
   if (success) {
     const title = '✅ 予定を更新しました';
@@ -255,11 +232,9 @@ function _handleNoteInput(replyToken, userId, newNote, state, cache) {
   }
 }
 
+
 // --- リマインダー送信 ---------------------------------------------------------
 
-/**
- * 設定された時刻にリマインダーを送信します。（トリガー実行用）
- */
 function sendReminders() {
   try {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
@@ -271,12 +246,23 @@ function sendReminders() {
     const allSchedules = getAllSchedules();
     if (!allSchedules) return;
 
+    // 最初にスケジュールをuserIdごとに整理する
+    const schedulesByUserId = allSchedules.reduce((acc, schedule) => {
+      const userId = schedule[COLUMNS_SCHEDULE.USER_ID];
+      if (!acc[userId]) {
+        acc[userId] = [];
+      }
+      acc[userId].push(schedule);
+      return acc;
+    }, {});
+
     allUsersData.forEach(userRow => {
       const userId = userRow[COLUMNS_USER.USER_ID];
-      const userSchedules = allSchedules.filter(row => row[COLUMNS_SCHEDULE.USER_ID] === userId);
+      // 整理済みのデータから瞬時に取り出す
+      const userSchedules = schedulesByUserId[userId] || [];
 
+      // 夜のリマインダー（前日通知）をチェック
       const reminderTimeNight = userRow[COLUMNS_USER.REMINDER_TIME_NIGHT];
-
       if (_isTimeToSend(now, reminderTimeNight)) {
         const tomorrow = new Date(now);
         tomorrow.setDate(now.getDate() + 1);
@@ -286,8 +272,8 @@ function sendReminders() {
         _sendReminderMessage(userId, userSchedules, targetDay, 'night');
       }
 
+      // 朝のリマインダー（当日通知）をチェック
       const reminderTimeMorning = userRow[COLUMNS_USER.REMINDER_TIME_MORNING];
-
       if (_isTimeToSend(now, reminderTimeMorning)) {
         const dayOfWeek = now.getDay();
         const targetDayIndex = (dayOfWeek === 0) ? 6 : dayOfWeek - 1;

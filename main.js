@@ -13,7 +13,7 @@ const CONFIG = {
   SECRET_TOKEN: PropertiesService.getScriptProperties().getProperty('SECRET_TOKEN'),
   DATABASE_SHEET_ID: PropertiesService.getScriptProperties().getProperty('DATABASE_SHEET_ID'),
   LOG_ID: PropertiesService.getScriptProperties().getProperty('LOG_ID'),
-  TERMS_URL: 'https://shizu-na.github.io/gomidashi-yoho/policy', // ★ ご自身のGitHub Pages等のURLに設定してください
+  TERMS_URL: PropertiesService.getScriptProperties().getProperty('TERMS_URL')
 };
 
 // --- メイン処理 ---------------------------------------------------------------
@@ -84,10 +84,22 @@ function handlePostback(event) {
     const { replyToken, source: { userId }, postback } = event;
     const params = _parseQueryString(postback.data);
     const action = params.action;
+    
+    const userRecord = getUserRecord(userId);
+
+    // ▼▼▼ 変更点：ifの条件をシンプルにしました ▼▼▼
+    // ユーザーが対話中であれば、いかなるボタン操作もブロックする
+    if (userRecord && userRecord.conversationState) {
+      replyToLine(replyToken, [{
+        type: 'text',
+        text: '現在、予定の変更手続き中です。先にそちらを完了するか、「キャンセル」と入力して中断してください。'
+      }]);
+      return;
+    }
+    // ▲▲▲ 変更ここまで ▲▲▲
 
     switch (action) {
       case 'agreeToTerms': {
-        const userRecord = getUserRecord(userId);
         if (userRecord && userRecord.status === USER_STATUS.ACTIVE) {
           replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.already_active)]);
           return;
@@ -148,17 +160,15 @@ function handleMessage(event) {
 
   try {
     const { replyToken, message: { text: userMessage } } = event;
+    const userRecord = getUserRecord(userId);
 
     // 予定変更フローの途中かチェック
-    const cache = CacheService.getUserCache();
-    const cachedState = cache.get(userId);
-    if (cachedState) {
-      continueModification(replyToken, userId, userMessage.trim(), cachedState);
+    if (userRecord && userRecord.conversationState) {
+      continueModification(replyToken, userId, userMessage.trim(), userRecord.conversationState);
       return;
     }
 
     // ユーザーの状態に応じて処理を分岐
-    const userRecord = getUserRecord(userId);
     if (!userRecord) {
       replyToLine(replyToken, [getTermsAgreementFlexMessage(CONFIG.TERMS_URL)]);
       return;

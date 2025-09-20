@@ -25,7 +25,7 @@ function _getDatabase() {
 /**
  * 指定したユーザーIDのレコードをUsersシートから検索します。
  * @param {string} userId - 検索するユーザーID
- * @returns {{row: number, status: string}|null} ユーザー情報（行番号、ステータス）またはnull
+ * @returns {{row: number, status: string, conversationState: string}|null} ユーザー情報
  */
 function getUserRecord(userId) {
   try {
@@ -37,16 +37,39 @@ function getUserRecord(userId) {
     const range = sheet.getRange("A:A").createTextFinder(userId).matchEntireCell(true).findNext();
     if (range) {
       const rowNum = range.getRow();
-      const status = sheet.getRange(rowNum, COLUMNS_USER.STATUS + 1).getValue();
+      const values = sheet.getRange(rowNum, COLUMNS_USER.STATUS + 1, 1, 2).getValues()[0];
       return {
         row: rowNum,
-        status: status
+        status: values[0],
+        conversationState: values[1]
       };
     }
     return null;
   } catch (e) {
     writeLog('ERROR', `ユーザーレコード検索でエラー: ${e.stack}`, userId);
     return null;
+  }
+}
+
+/**
+ * ユーザーの対話状態を更新します。
+ * @param {string} userId - 対象のユーザーID
+ * @param {string|null} state - 設定する状態のJSON文字列、またはクリアする場合はnull
+ * @returns {boolean} 更新が成功したかどうか
+ */
+function updateConversationState(userId, state) {
+  try {
+    const userRecord = getUserRecord(userId);
+    if (!userRecord) return false;
+
+    const db = _getDatabase();
+    if (!db) return false;
+    const sheet = db.getSheetByName(SHEET_NAMES.USERS);
+    sheet.getRange(userRecord.row, COLUMNS_USER.CONVERSATION_STATE + 1).setValue(state || '');
+    return true;
+  } catch (e) {
+    writeLog('ERROR', `対話状態の更新でエラー: ${e.stack}`, userId);
+    return false;
   }
 }
 

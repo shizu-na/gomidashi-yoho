@@ -17,6 +17,7 @@ const COLUMNS_USER = {
   UPDATED_AT: 3,            // D列
   REMINDER_TIME_NIGHT: 4,   // E列
   REMINDER_TIME_MORNING: 5, // F列
+  CONVERSATION_STATE: 6,    // G列
 };
 
 const COLUMNS_SCHEDULE = {
