@@ -1,6 +1,27 @@
 /**
  * @fileoverview LINE Flex MessageのJSONオブジェクトを生成するための関数群です。
  * このファイルは、宣言的なUI構築のための「ビルダー関数」パターンを使用しています。
+ *
+ * @styleguide
+ * 1. ビルダー関数の引数とoptionsオブジェクトの間で改行を入れ、内容と装飾を分離します。
+ * 例:
+ * Text(
+ * "こんにちは",
+ * { size: "sm" }
+ * )
+ *
+ * 2. BoxやCarouselのcontents配列は、各要素を縦に並べます。
+ * 例:
+ * Box(
+ * [
+ * Text("1行目"),
+ * Text("2行目")
+ * ],
+ * { spacing: "md" }
+ * )
+ *
+ * 3. 例外: contents配列の要素が1つだけの場合は、可読性のため一行での記述を許容します。
+ * 例: Box([ Text("要素は1つだけ") ], { ... })
  */
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -145,32 +166,153 @@ function DatetimePickerAction(label, data, { initial, mode }) {
 function getHelpFlexMessage() {
   const helpBubbles = [
     Bubble({
-      header: Box([Text("📅 予定一覧・編集", { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" })], { backgroundColor: "#176FB8", paddingAll: "12px" }),
-      body:   Box([
-        Text("1週間の予定をカード形式で表示。", { wrap: true, size: "sm", align: "center" }),
-        Text("そのカードをタップすると\n予定を編集できます。", { margin: "none", wrap: true, size: "sm", align: "center", weight: "bold" })
-      ], { paddingAll: "15px" }),
-      footer: Box([Button(MessageAction("「一覧」を送る", "一覧"), { style: "primary", height: "sm" })], { paddingTop: "0px" })
+      header: Box(
+        [
+          Text(
+            "📅 予定一覧・編集", 
+            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
+          )
+        ], 
+        { backgroundColor: "#176FB8", paddingAll: "12px" }
+      ),
+      body: Box(
+        [
+          Text(
+            "1週間の予定をカード形式で表示。", 
+            { wrap: true, size: "sm", align: "center" }
+          ),
+          Text(
+            "そのカードをタップすると\n予定を編集できます。", 
+            { margin: "none", wrap: true, size: "sm", align: "center", weight: "bold" }
+          )
+        ], 
+        { paddingAll: "15px" }
+      ),
+      footer: Box(
+        [
+          Button(
+            MessageAction("「一覧」を送る", "一覧"), 
+            { style: "primary", height: "sm" }
+          )
+        ], 
+        { paddingTop: "0px" }
+      )
     }, { size: "hecto" }),
     Bubble({
-      header: Box([Text("🚮 今日のごみを確認", { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" })], { backgroundColor: "#5A9E46", paddingAll: "12px" }),
-      body:   Box([Text("今日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。", { wrap: true, size: "sm", align: "center" })], { paddingAll: "15px", spacing: "sm" }),
-      footer: Box([Button(MessageAction("「今日」を送る", "今日"), { style: "primary", color: "#5A9E46", height: "sm" })], { paddingTop: "0px" })
+      header: Box(
+        [
+          Text(
+            "🚮 今日のごみを確認", 
+            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
+          )
+        ], 
+        { backgroundColor: "#5A9E46", paddingAll: "12px" }
+      ),
+      body: Box(
+        [
+          Text(
+            "今日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。", 
+            { wrap: true, size: "sm", align: "center" }
+          )
+        ], 
+        { paddingAll: "15px", spacing: "sm" }
+      ),
+      footer: Box(
+        [
+          Button(
+            MessageAction("「今日」を送る", "今日"), 
+            { style: "primary", color: "#5A9E46", height: "sm" }
+          )
+        ], 
+        { paddingTop: "0px" }
+      )
     }, { size: "hecto" }),
     Bubble({
-      header: Box([Text("🗑️ 明日のごみを確認", { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" })], { backgroundColor: "#5A9E46", paddingAll: "12px" }),
-      body:   Box([Text("明日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。", { wrap: true, size: "sm", align: "center" })], { paddingAll: "15px", spacing: "sm" }),
-      footer: Box([Button(MessageAction("「明日」を送る", "明日"), { style: "primary", color: "#5A9E46", height: "sm" })], { paddingTop: "0px" })
+      header: Box(
+        [
+          Text(
+            "🗑️ 明日のごみを確認", 
+            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
+          )
+        ], 
+        { backgroundColor: "#5A9E46", paddingAll: "12px" }
+      ),
+      body: Box(
+        [
+          Text(
+            "明日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。", 
+            { wrap: true, size: "sm", align: "center" }
+          )
+        ], 
+        { paddingAll: "15px", spacing: "sm" }
+      ),
+      footer: Box(
+        [
+          Button(
+            MessageAction("「明日」を送る", "明日"), 
+            { style: "primary", color: "#5A9E46", height: "sm" }
+          )
+        ], 
+        { paddingTop: "0px" }
+      )
     }, { size: "hecto" }),
     Bubble({
-      header: Box([Text("🔔 リマインダー機能", { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" })], { backgroundColor: "#176FB8", paddingAll: "12px" }),
-      body:   Box([Text("「前日の夜」と「当日の朝」、\n2つのタイミングでごみ出しを\nリマインドできます。", { wrap: true, size: "sm", align: "center" })], { paddingAll: "15px", spacing: "sm" }),
-      footer: Box([Button(MessageAction("時刻を設定する", "リマインダー"), { style: "primary", color: "#176FB8", height: "sm" })], { paddingTop: "0px" })
+      header: Box(
+        [
+          Text(
+            "🔔 リマインダー機能", 
+            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
+          )
+        ], 
+        { backgroundColor: "#176FB8", paddingAll: "12px" }
+      ),
+      body: Box(
+        [
+          Text(
+            "「前日の夜」と「当日の朝」、\n2つのタイミングでごみ出しを\nリマインドできます。", 
+            { wrap: true, size: "sm", align: "center" }
+          )
+        ], 
+        { paddingAll: "15px", spacing: "sm" }
+      ),
+      footer: Box(
+        [
+          Button(
+            MessageAction("時刻を設定する", "リマインダー"), 
+            { style: "primary", color: "#176FB8", height: "sm" }
+          )
+        ], 
+        { paddingTop: "0px" }
+      )
     }, { size: "hecto" }),
     Bubble({
-      header: Box([Text("⚙️ 利用の停止（退会）", { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" })], { backgroundColor: "#6C757D", paddingAll: "12px" }),
-      body:   Box([Text("利用を停止します。\nデータは一時的に保持され、\nいつでも利用を再開できます。", { wrap: true, size: "sm", align: "center" })], { paddingAll: "15px", spacing: "sm" }),
-      footer: Box([Button(MessageAction("「退会」を送る", "退会"), { style: "secondary", height: "sm" })], { paddingTop: "0px" })
+      header: Box(
+        [
+          Text(
+            "⚙️ 利用の停止（退会）", 
+            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
+          )
+        ], 
+        { backgroundColor: "#6C757D", paddingAll: "12px" }
+      ),
+      body: Box(
+        [
+          Text(
+            "利用を停止します。\nデータは一時的に保持され、\nいつでも利用を再開できます。", 
+            { wrap: true, size: "sm", align: "center" }
+          )
+        ], 
+        { paddingAll: "15px", spacing: "sm" }
+      ),
+      footer: Box(
+        [
+          Button(
+            MessageAction("「退会」を送る", "退会"), 
+            { style: "secondary", height: "sm" }
+          )
+        ], 
+        { paddingTop: "0px" }
+      )
     }, { size: "hecto" })
   ];
   return FlexMessage(MESSAGES.flex.helpAltText, Carousel(helpBubbles));
@@ -196,17 +338,33 @@ function createScheduleFlexMessage(userId) {
     const note = row[COLUMNS_SCHEDULE.NOTES] || "";
 
     const bodyContents = [
-      Text(item, { wrap: true, weight: "bold", size: "md" })
+      Text(
+        item,
+        { wrap: true, weight: "bold", size: "md" }
+      )
     ];
 
     if (note && note !== "-") {
       bodyContents.push(Separator({ margin: "lg" }));
-      bodyContents.push(Text(note, { wrap: true, size: "sm", color: "#666666" }));
+      bodyContents.push(
+        Text(
+          note,
+          { wrap: true, size: "sm", color: "#666666" }
+        )
+      );
     }
 
     return Bubble({
-      header: Box([Text(day.replace("曜日", ""), { weight: "bold", size: "xl", color: "#176FB8", align: "center" })], { paddingAll: "10px", backgroundColor: "#f0f8ff" }),
-      body:   Box(bodyContents, { spacing: "md" })
+      header: Box(
+        [
+          Text(
+            day.replace("曜日", ""), 
+            { weight: "bold", size: "xl", color: "#176FB8", align: "center" }
+          )
+        ], 
+        { paddingAll: "10px", backgroundColor: "#f0f8ff" }
+      ),
+      body: Box(bodyContents, { spacing: "md" })
     }, {
       size: "nano",
       action: PostbackAction("変更", `action=startChange&day=${day}`)
@@ -220,14 +378,44 @@ function createScheduleFlexMessage(userId) {
  * 利用規約同意のFlex Messageを生成します。
  */
 function getTermsAgreementFlexMessage(termsUrl) {
-  const header = Box([Text("📝 ご利用前の確認", { weight: "bold", color: "#FFFFFF", size: "lg", align: "center" })], { backgroundColor: "#6C757D", paddingAll: "12px" });
-  const body = Box([Text("ご利用には、利用規約・プライバシーポリシーへの同意が必要です。内容を確認し、下のボタンを選択してください。", { wrap: true, size: "sm", align: "center" })], { paddingAll: "15px", spacing: "md" });
-  const footer = Box([
-    Button(UriAction("内容を読む", termsUrl), { height: "sm", style: "link" }),
-    Separator({ margin: "md" }),
-    Button(PostbackAction("同意して利用を開始する", "action=agreeToTerms"), { style: "primary", color: "#5A9E46", height: "sm" }),
-    Button(PostbackAction("同意しない", "action=disagreeToTerms"), { style: "secondary", height: "sm" })
-  ], { spacing: "sm", paddingTop: "0px" });
+  const header = Box(
+    [
+      Text(
+        "📝 ご利用前の確認", 
+        { weight: "bold", color: "#FFFFFF", size: "lg", align: "center" }
+      )
+    ], 
+    { backgroundColor: "#6C757D", paddingAll: "12px" }
+  );
+  
+  const body = Box(
+    [
+      Text(
+        "ご利用には、利用規約・プライバシーポリシーへの同意が必要です。内容を確認し、下のボタンを選択してください。", 
+        { wrap: true, size: "sm", align: "center" }
+      )
+    ], 
+    { paddingAll: "15px", spacing: "md" }
+  );
+
+  const footer = Box(
+    [
+      Button(
+        UriAction("内容を読む", termsUrl), 
+        { height: "sm", style: "link" }
+      ),
+      Separator({ margin: "md" }),
+      Button(
+        PostbackAction("同意して利用を開始する", "action=agreeToTerms"), 
+        { style: "primary", color: "#5A9E46", height: "sm" }
+      ),
+      Button(
+        PostbackAction("同意しない", "action=disagreeToTerms"), 
+        { style: "secondary", height: "sm" }
+      )
+    ], 
+    { spacing: "sm", paddingTop: "0px" }
+  );
   
   const bubble = Bubble({ header, body, footer }, { size: "mega" });
   return FlexMessage("ご利用には利用規約への同意が必要です。", bubble);
@@ -240,7 +428,11 @@ function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) 
   const nightBubble = _createReminderBubble('night', '夜のリマインダー 🌙', '前日の夜に、翌日のごみ出し予定を通知します。', currentNightTime, '21:00');
   const morningBubble = _createReminderBubble('morning', '朝のリマインダー ☀️', '当日の朝に、今日のごみ出し予定を通知します。', currentMorningTime, '07:00');
   
-  return FlexMessage("リマインダー設定", Carousel([nightBubble, morningBubble]), QUICK_REPLIES.DEFAULT);
+  return FlexMessage(
+    "リマインダー設定", 
+    Carousel([nightBubble, morningBubble]), 
+    QUICK_REPLIES.DEFAULT
+  );
 }
 
 /**
@@ -248,23 +440,38 @@ function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) 
  */
 function createSingleDayFlexMessage(title, day, item, note, altText, withQuickReply = false) {
   const bodyContents = [
-    Text(item || "（未設定）", { wrap: true, weight: "bold", size: "xl", margin: "md" }),
+    Text(
+      item || "（未設定）", 
+      { wrap: true, weight: "bold", size: "xl", margin: "md" }
+    ),
   ];
 
   if (note && note !== "-") {
     bodyContents.push(Separator({ margin: "xl" }));
     bodyContents.push(
-      Box([
-        Text("メモ", { color: "#aaaaaa", size: "sm", flex: 1 }),
-        Text(note, { wrap: true, size: "sm", color: "#666666", flex: 5 }),
-      ], { margin: "lg", spacing: "sm" })
+      Box(
+        [
+          Text("メモ", { color: "#aaaaaa", size: "sm", flex: 1 }),
+          Text(note, { wrap: true, size: "sm", color: "#666666", flex: 5 }),
+        ], 
+        { margin: "lg", spacing: "sm" }
+      )
     );
   }
 
-  const header = Box([
-    Text(title, { color: "#ffffff", size: "md", weight: "bold" }),
-    Text(day, { color: "#ffffff", size: "xl", weight: "bold", margin: "sm" }),
-  ], { paddingAll: "12px", backgroundColor: "#176FB8" });
+  const header = Box(
+    [
+      Text(
+        title, 
+        { color: "#ffffff", size: "md", weight: "bold" }
+      ),
+      Text(
+        day, 
+        { color: "#ffffff", size: "xl", weight: "bold", margin: "sm" }
+      ),
+    ], 
+    { paddingAll: "12px", backgroundColor: "#176FB8" }
+  );
   
   const body = Box(bodyContents, { spacing: "md" });
   
