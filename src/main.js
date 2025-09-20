@@ -23,15 +23,12 @@ const CONFIG = {
  * @param {GoogleAppsScript.Events.DoPost} e - Webhookイベントオブジェクト
  */
 function doPost(e) {
-  // Webhook URLに含まれるトークンを検証
   if (e.parameter.token !== CONFIG.SECRET_TOKEN) {
     console.error("不正なリクエストです: トークンが一致しません。");
     return;
   }
-
   try {
     const event = JSON.parse(e.postData.contents).events[0];
-
     switch (event.type) {
       case 'message':
         handleMessage(event);
@@ -77,7 +74,7 @@ function handleFollowEvent(event) {
 
 /**
  * ポストバックイベントを処理します。
- * @param {object} event - LINE Webhookイベントオブジェクト
+ * (日時ピッカーからの応答など、特殊なケースのみを処理します)
  */
 function handlePostback(event) {
   try {
@@ -85,69 +82,17 @@ function handlePostback(event) {
     const params = _parseQueryString(postback.data);
     const action = params.action;
     
-    const userRecord = getUserRecord(userId);
-
-    // ユーザーが対話中であれば、いかなるボタン操作もブロックする
-    if (userRecord && userRecord.conversationState) {
-      const state = JSON.parse(userRecord.conversationState);
-      
-      const blockingMessage = {
-        type: 'text',
-        text: '現在、予定の変更手続き中です。先にそちらを完了するか、「キャンセル」と入力して中断してください。'
-      };
-      
-      let repromptMessage;
-      if (state.step === MODIFICATION_FLOW.STEPS.WAITING_FOR_ITEM) {
-        repromptMessage = getModificationItemPromptMessage(state.day, state.currentItem);
-      } else if (state.step === MODIFICATION_FLOW.STEPS.WAITING_FOR_NOTE) {
-        repromptMessage = getModificationNotePromptMessage(state.currentNote);
-      }
-      
-      replyToLine(replyToken, [blockingMessage, repromptMessage]);
-      return;
-    }
+    // ▼▼▼ `conversationState`のチェックは不要になったため削除 ▼▼▼
 
     switch (action) {
-      case 'agreeToTerms': {
-        if (userRecord && userRecord.status === USER_STATUS.ACTIVE) {
-          replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.already_active)]);
-          return;
-        }
-        createNewUser(userId);
-        writeLog('INFO', '新規ユーザー登録完了', userId);
-        replyToLine(replyToken, [getMenuMessage(MESSAGES.registration.agreed)]);
-        break;
-      }
-
-      case 'disagreeToTerms': {
-        replyToLine(replyToken, [{ type: 'text', text: MESSAGES.registration.disagreed }]);
-        break;
-      }
-
+      // ▼▼▼ 日時ピッカーの応答のみを処理するように簡素化 ▼▼▼
       case 'setReminderTime': {
         const selectedTime = postback.params.time;
-        const type = params.type; // 'night' or 'morning'
+        const type = params.type;
         updateReminderTime(userId, selectedTime, type);
-
         const typeText = (type === 'night') ? '夜' : '朝';
-        const replyText = `✅ 変更いたしました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
+        const replyText = `✅ 承知いたしました。【${typeText}のリマインダー】を毎日 ${selectedTime} に送信します。`;
         replyToLine(replyToken, [getMenuMessage(replyText)]);
-        break;
-      }
-
-      case 'stopReminder': {
-        const type = params.type; // 'night' or 'morning'
-        updateReminderTime(userId, null, type);
-
-        const typeText = (type === 'night') ? '夜' : '朝';
-        const replyText = `✅【${typeText}のリマインダー】を停止しました。`;
-        replyToLine(replyToken, [getMenuMessage(replyText)]);
-        break;
-      }
-
-      case 'startChange': {
-        const day = params.day;
-        startModificationFlow(replyToken, userId, day);
         break;
       }
     }
@@ -158,48 +103,56 @@ function handlePostback(event) {
 
 /**
  * 全てのメッセージイベントを処理する司令塔です。
- * @param {object} event - LINE Webhookイベントオブジェクト
+ * (COMMAND_MAPに基づいて適切な処理を呼び出します)
  */
 function handleMessage(event) {
-  if (event.message.type !== 'text') {
-    return;
-  }
+  if (event.message.type !== 'text') return;
 
   const userId = event.source.userId;
-
   try {
-    const { replyToken, message: { text: userMessage } } = event;
+    const userMessage = event.message.text.trim();
     const userRecord = getUserRecord(userId);
 
-    // 予定変更フローの途中かチェック
+    // 予定変更フローの対話中かチェック
     if (userRecord && userRecord.conversationState) {
-      continueModification(replyToken, userId, userMessage.trim(), userRecord.conversationState);
+      continueModification(event.replyToken, userId, userMessage, userRecord.conversationState);
       return;
     }
-
-    // ユーザーの状態に応じて処理を分岐
+    // ユーザー登録がまだかチェック
     if (!userRecord) {
-      replyToLine(replyToken, [getTermsAgreementFlexMessage(CONFIG.TERMS_URL)]);
+      if (userMessage === '利用規約に同意する') {
+        const messages = _handleAgreeToTermsCommand(event);
+        replyToLine(event.replyToken, messages);
+      } else {
+        replyToLine(event.replyToken, [getTermsAgreementFlexMessage(CONFIG.TERMS_URL)]);
+      }
       return;
     }
-
+    // 利用停止中かチェック
     if (userRecord.status === USER_STATUS.UNSUBSCRIBED) {
-      if (userMessage.trim() === '利用を再開する') {
+      if (userMessage === '利用を再開する') {
         updateUserStatus(userId, USER_STATUS.ACTIVE);
-        replyToLine(replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
+        replyToLine(event.replyToken, [getMenuMessage(MESSAGES.unregistration.reactivate)]);
       } else {
-        replyToLine(replyToken, [getReactivationPromptMessage(MESSAGES.unregistration.unsubscribed)]);
+        replyToLine(event.replyToken, [getReactivationPromptMessage(MESSAGES.unregistration.unsubscribed)]);
       }
       return;
     }
 
-    // 通常のコマンド処理
-    const replyMessages = createReplyMessage(event);
-    if (replyMessages && replyMessages.length > 0) {
-      replyToLine(replyToken, replyMessages);
-    } else {
-      replyToLine(replyToken, [getFallbackMessage()]);
+    // COMMAND_MAPに基づいてコマンドを処理
+    for (const [regex, handler] of COMMAND_MAP) {
+      const match = userMessage.match(regex);
+      if (match) {
+        const replyMessages = handler(event, match);
+        if (replyMessages && replyMessages.length > 0) {
+          replyToLine(event.replyToken, replyMessages);
+        }
+        return; // 処理が完了したら終了
+      }
     }
+
+    // どのコマンドにも一致しなかった場合
+    replyToLine(event.replyToken, [getFallbackMessage()]);
   } catch (err) {
     writeLog('ERROR', `handleMessage処理中にエラー: ${err.stack}`, userId);
   }

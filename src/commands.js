@@ -1,96 +1,93 @@
 /**
  * @fileoverview ユーザーからのメッセージ(コマンド)に応じた応答を生成するロジックです。
+ * 「コマンドマッピング」パターンに基づき、コマンドと処理関数を関連付けています。
  */
 
-/**
- * ユーザーメッセージに基づき、適切な返信メッセージオブジェクトを生成します。
- * @param {object} event - LINE Webhookイベントオブジェクト
- * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
- */
-function createReplyMessage(event) {
-  const userMessage = event.message.text.trim();
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// 1. コマンドと処理の対応表 (COMMAND_MAP)
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+const COMMAND_MAP = new Map([
+  // --- 完全一致コマンド ---
+  [/^一覧$/, _handleScheduleList],
+  [/^今日$|^きょう$/, (event) => handleGarbageQuery(event, '今日')],
+  [/^明日$|^あした$/, (event) => handleGarbageQuery(event, '明日')],
+  [/^リマインダー$/, _handleReminder],
+  [/^使い方$|^ヘルプ$/, (event) => [getHelpFlexMessage()]],
+  [/^退会$/, _handleUnregistration],
+
+  // --- パターンマッチコマンド (MessageAction由来) ---
+  [/^変更\s(月|火|水|木|金|土|日)曜日$/, _handleChangeCommand],
+  [/^停止\s(夜|朝)$/, _handleStopReminderCommand],
+  [/^利用規約に同意する$/, _handleAgreeToTermsCommand],
+  [/^利用規約に同意しない$/, _handleDisagreeToTermsCommand],
+]);
+
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// 2. 各コマンドの処理担当関数
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// --- パターンマッチコマンドの処理 ---
+
+/** 「変更 ○曜日」コマンドを処理します */
+function _handleChangeCommand(event, match) {
+  const day = `${match[1]}曜日`; // match[1]には正規表現の()でキャプチャした曜日（例: "月"）が入る
+  startModificationFlow(event.replyToken, event.source.userId, day);
+  return null; // 応答はstartModificationFlowが個別に行う
+}
+
+/** 「停止 ○」コマンドを処理します */
+function _handleStopReminderCommand(event, match) {
+  const type = (match[1] === '夜') ? 'night' : 'morning';
+  updateReminderTime(event.source.userId, null, type);
+  const typeText = (match[1] === '夜') ? '夜' : '朝';
+  const replyText = `✅【${typeText}のリマインダー】を停止しました。`;
+  return [getMenuMessage(replyText)];
+}
+
+/** 「利用規約に同意する」コマンドを処理します */
+function _handleAgreeToTermsCommand(event) {
   const userId = event.source.userId;
-
-  try {
-    let messages = null;
-
-    switch (userMessage) {
-      case '退会':
-        messages = [_handleUnregistration(userId)];
-        break;
-      case 'リマインダー':
-        messages = _handleReminder(userId);
-        break;
-      case '使い方':
-      case 'ヘルプ':
-        messages = [getHelpFlexMessage()];
-        break;
-      case '一覧':
-        messages = _handleScheduleList(userId);
-        break;
-      default:
-        // '今日', '明日' などのキーワード応答を処理
-        messages = handleGarbageQuery(userMessage, userId);
-        break;
-    }
-
-    if (messages) {
-      return Array.isArray(messages) ? messages : [messages];
-    }
-    return null; // どのコマンドにも一致しない場合
-
-  } catch (err) {
-    writeLog('CRITICAL', `createReplyMessageで予期せぬエラー: ${err.stack}`, userId);
-    return [{ type: 'text', text: MESSAGES.common.error }];
+  const userRecord = getUserRecord(userId);
+  if (userRecord && userRecord.status === USER_STATUS.ACTIVE) {
+    return [getMenuMessage(MESSAGES.registration.already_active)];
   }
+  createNewUser(userId);
+  writeLog('INFO', '新規ユーザー登録完了', userId);
+  return [getMenuMessage(MESSAGES.registration.agreed)];
 }
 
-/**
- * 「退会」コマンドを処理します。
- * @private
- * @param {string} userId - ユーザーID
- * @returns {object} 送信するメッセージオブジェクト
- */
-function _handleUnregistration(userId) {
-  try {
-    updateUserStatus(userId, USER_STATUS.UNSUBSCRIBED);
-    writeLog('INFO', 'ユーザー退会（論理削除）', userId);
-    return { type: 'text', text: MESSAGES.unregistration.success };
-  } catch (e) {
-    writeLog('ERROR', `退会処理: ${e.message}`, userId);
-    return { type: 'text', text: MESSAGES.common.error };
-  }
+/** 「利用規約に同意しない」コマンドを処理します */
+function _handleDisagreeToTermsCommand(event) {
+  return [{ type: 'text', text: MESSAGES.registration.disagreed }];
 }
 
-/**
- * 「リマインダー」コマンドを処理します。
- * @private
- * @param {string} userId - ユーザーID
- * @returns {Array<object>} 送信するメッセージオブジェクトの配列
- */
-function _handleReminder(userId) {
-  // if (!isUserOnAllowlist(userId)) {
-  //   return [{ type: 'text', text: '申し訳ありません。この機能は許可されたユーザーのみご利用いただけます。' }];
-  // }
+// --- 従来のコマンド処理（一部改修） ---
 
+/** 「退会」コマンドを処理します */
+function _handleUnregistration(event) {
+  const userId = event.source.userId;
+  updateUserStatus(userId, USER_STATUS.UNSUBSCRIBED);
+  writeLog('INFO', 'ユーザー退会（論理削除）', userId);
+  return [{ type: 'text', text: MESSAGES.unregistration.success }];
+}
+
+/** 「リマインダー」コマンドを処理します */
+function _handleReminder(event) {
+  const userId = event.source.userId;
   const userRecord = getUserRecord(userId);
   if (!userRecord) {
     writeLog('ERROR', '「リマインダー」処理中にユーザーレコード取得失敗。', userId);
     return [{ type: 'text', text: 'ユーザー情報が見つかりませんでした。'}];
   }
-
   const { nightTime, morningTime } = getReminderTimes(userRecord.row);
-  const flexMessage = getReminderManagementFlexMessage(nightTime, morningTime);
-  return [flexMessage];
+  return [getReminderManagementFlexMessage(nightTime, morningTime)];
 }
 
-/**
- * 「一覧」コマンドを処理します。
- * @private
- * @param {string} userId - ユーザーID
- * @returns {Array<object>} 送信するメッセージオブジェクトの配列
- */
-function _handleScheduleList(userId) {
+/** 「一覧」コマンドを処理します */
+function _handleScheduleList(event) {
+  const userId = event.source.userId;
   const carouselMessage = createScheduleFlexMessage(userId);
   if (carouselMessage && carouselMessage.type === 'flex') {
     const promptMessage = {
@@ -100,41 +97,31 @@ function _handleScheduleList(userId) {
     };
     return [carouselMessage, promptMessage];
   }
-  // スケジュール未登録などの場合は、単一のメッセージオブジェクトが返る
   return [carouselMessage];
 }
 
-/**
- * 「今日」「明日」などのごみ出し日に関する問い合わせを処理します。
- * @param {string} command - ユーザーが入力したコマンド (例: '今日')
- * @param {string} userId - ユーザーID
- * @returns {Array<object>|null} 送信するメッセージオブジェクトの配列、またはnull
- */
-function handleGarbageQuery(command, userId) {
+/** 「今日」「明日」などのごみ出し日に関する問い合わせを処理します */
+function handleGarbageQuery(event, command) {
+  const userId = event.source.userId;
   const data = getSchedulesByUserId(userId);
   if (data.length === 0) {
     return [getMenuMessage(MESSAGES.query.sheetEmpty)];
   }
 
   const todayJST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-  let targetDay;
-  let title;
+  let targetDay, title;
 
-  if (command === '今日' || command === 'きょう') {
-    const dayOfWeek = todayJST.getDay(); // 元の日曜=0, 月曜=1...
-    const targetDayIndex = (dayOfWeek === 0) ? 6 : dayOfWeek - 1; // 月曜=0, ..., 日曜=6 に変換
-    targetDay = WEEKDAYS_FULL[targetDayIndex];
+  if (command === '今日') {
+    const dayOfWeek = todayJST.getDay();
+    targetDay = WEEKDAYS_FULL[(dayOfWeek === 0) ? 6 : dayOfWeek - 1];
     title = '今日のごみ🗑️';
-  } else if (command === '明日' || command === 'あした') {
+  } else if (command === '明日') {
     const tomorrowJST = new Date(todayJST);
     tomorrowJST.setDate(tomorrowJST.getDate() + 1);
-    const dayOfWeek = tomorrowJST.getDay(); // 元の日曜=0, 月曜=1...
-    const targetDayIndex = (dayOfWeek === 0) ? 6 : dayOfWeek - 1; // 月曜=0, ..., 日曜=6 に変換
-    targetDay = WEEKDAYS_FULL[targetDayIndex];
+    const dayOfWeek = tomorrowJST.getDay();
+    targetDay = WEEKDAYS_FULL[(dayOfWeek === 0) ? 6 : dayOfWeek - 1];
     title = '明日のごみ🗑️';
   }
-
-  if (!targetDay) return null; // '今日' '明日' 以外のメッセージ
 
   const foundRow = data.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
   if (!foundRow) {
@@ -144,9 +131,7 @@ function handleGarbageQuery(command, userId) {
   const item = foundRow[COLUMNS_SCHEDULE.GARBAGE_TYPE];
   const note = foundRow[COLUMNS_SCHEDULE.NOTES];
   const altText = `${targetDay}のごみは「${item}」です。`;
-
-  const flexMessage = createSingleDayFlexMessage(title, targetDay, item, note, altText, true);
-  return [flexMessage];
+  return [createSingleDayFlexMessage(title, targetDay, item, note, altText, true)];
 }
 
 // --- 予定変更フロー -----------------------------------------------------------

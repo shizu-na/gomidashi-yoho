@@ -364,7 +364,8 @@ function createScheduleFlexMessage(userId) {
     return Bubble(
       {
         size: "nano",
-        action: PostbackAction("変更", `action=startChange&day=${day}`)
+        // ▼▼▼ PostbackAction → MessageAction に変更 ▼▼▼
+        action: MessageAction("変更", `変更 ${day}`)
       },
       {
         header: Box(
@@ -418,11 +419,11 @@ function getTermsAgreementFlexMessage(termsUrl) {
       Separator({ margin: "md" }),
       Button(
         { style: "primary", color: "#5A9E46", height: "sm" },
-        PostbackAction("同意して利用を開始する", "action=agreeToTerms")
+        MessageAction("同意して利用を開始する", "利用規約に同意する")
       ),
       Button(
         { style: "secondary", height: "sm" },
-        PostbackAction("同意しない", "action=disagreeToTerms")
+        MessageAction("同意しない", "利用規約に同意しない")
       )
     ]
   );
@@ -548,7 +549,7 @@ function _createReminderBubble(type, title, description, currentTime, defaultTim
       ),
       Button(
         { style: "secondary", height: "sm" },
-        PostbackAction("リマインダーを停止する", `action=stopReminder&type=${type}`)
+        MessageAction("リマインダーを停止する", `停止 ${type === 'night' ? '夜' : '朝'}`)
       ),
       Separator({ margin: "md" }),
       Text(
