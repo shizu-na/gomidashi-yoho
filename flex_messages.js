@@ -2,26 +2,22 @@
  * @fileoverview LINE Flex MessageのJSONオブジェクトを生成するための関数群です。
  * このファイルは、宣言的なUI構築のための「ビルダー関数」パターンを使用しています。
  *
- * @styleguide
- * 1. ビルダー関数の引数とoptionsオブジェクトの間で改行を入れ、内容と装飾を分離します。
- * 例:
- * Text(
- * "こんにちは",
- * { size: "sm" }
- * )
+ * @styleguide Flex Message ビルダースタイルガイド
+ * 1. コンテナ系関数 (Box, Bubble等) は、引数を `(options, contents)` の順番で受け取ります。
+ * optionsが不要な場合は、空のオブジェクト `{}` を渡します。
  *
- * 2. BoxやCarouselのcontents配列は、各要素を縦に並べます。
- * 例:
+ * 2. 関数呼び出しは、UIの構造とコードの構造を一致させるため、改行を積極的に使用します。
+ *
+ * @example
  * Box(
- * [
- * Text("1行目"),
- * Text("2行目")
- * ],
- * { spacing: "md" }
+ * { backgroundColor: "#FFFFFF", paddingAll: "lg" }, // Boxのoptions
+ * [ // Boxのcontents (配列)
+ * Text(
+ * "こんにちは", // Textの必須引数
+ * { size: "sm" } // Textのoptions
  * )
- *
- * 3. 例外: contents配列の要素が1つだけの場合は、可読性のため一行での記述を許容します。
- * 例: Box([ Text("要素は1つだけ") ], { ... })
+ * ]
+ * )
  */
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -35,9 +31,9 @@
  * @param {string} altText - 通知などに表示される代替テキスト。
  * @param {object} contents - BubbleまたはCarouselコンポーネント。
  * @param {object} [quickReply=null] - 表示するクイックリプライオブジェクト。
- * @returns {object} Flex Messageオブジェクト。
  */
 function FlexMessage(altText, contents, quickReply = null) {
+  // （この関数はoptionsを持たないので変更なし）
   const message = {
     type: "flex",
     altText: altText,
@@ -52,19 +48,18 @@ function FlexMessage(altText, contents, quickReply = null) {
 /**
  * 複数のバブルを並べるCarouselコンポーネントです。
  * @param {Array<object>} bubbles - Bubbleコンポーネントの配列。
- * @returns {object} Carouselコンポーネント。
  */
 function Carousel(bubbles) {
+  // （この関数はoptionsを持たないので変更なし）
   return { type: "carousel", contents: bubbles };
 }
 
 /**
  * 1つのメッセージカードとなるBubbleコンポーネントです。
+ * @param {object} options - Bubbleのプロパティ (例: { size: "mega", action: ... })
  * @param {object} parts - { header, body, footer } を含むオブジェクト。
- * @param {object} [options={}] - Bubbleのプロパティ (例: { size: "mega", action: PostbackAction(...) })
- * @returns {object} Bubbleコンポーネント。
  */
-function Bubble({ header, body, footer }, options = {}) {
+function Bubble(options, { header, body, footer }) {
   const bubble = { type: "bubble" };
   if (header) bubble.header = header;
   if (body)   bubble.body   = body;
@@ -74,24 +69,25 @@ function Bubble({ header, body, footer }, options = {}) {
 
 /**
  * パーツをまとめる汎用的なBoxコンポーネントです。
+ * @param {object} options - Boxのプロパティ (例: { layout: "horizontal", ... })
  * @param {Array<object>} contents - 中に入れるコンポーネントの配列。
- * @param {object} [options={}] - Boxのプロパティ (例: { layout: "horizontal", spacing: "md", backgroundColor: "#FFFFFF" })
- * @returns {object} Boxコンポーネント。
  */
-function Box(contents, options = {}) {
-  return { type: "box", layout: "vertical", contents: contents, ...options };
+function Box(options, contents) {
+  // デフォルトのlayoutプロパティを設定しつつ、optionsで上書き可能にする
+  const defaultOptions = { layout: "vertical" };
+  return { type: "box", ...defaultOptions, ...options, contents: contents };
 }
 
 // --- コンテンツ系 ---
 
 /**
  * Textコンポーネントです。
+ * @param {object} options - Textのプロパティ (例: { size: "md", color: "#666666", wrap: true })
  * @param {string} text - 表示するテキスト。
- * @param {object} [options={}] - Textのプロパティ (例: { size: "md", color: "#666666", wrap: true })
  * @returns {object} Textコンポーネント。
  */
-function Text(text, options = {}) {
-  return { type: "text", text: text, ...options };
+function Text(options, text) {
+  return { type: "text", ...options, text: text };
 }
 
 /**
@@ -105,12 +101,12 @@ function Separator(options = {}) {
 
 /**
  * Buttonコンポーネントです。
+ * @param {object} options - Buttonのプロパティ (例: { style: "primary", height: "sm", color: "#176FB8" })
  * @param {object} action - ボタンが押されたときのアクションオブジェクト。MessageAction()などで生成します。
- * @param {object} [options={}] - Buttonのプロパティ (例: { style: "primary", height: "sm", color: "#176FB8" })
  * @returns {object} Buttonコンポーネント。
  */
-function Button(action, options = {}) {
-  return { type: "button", action: action, ...options };
+function Button(options, action) {
+  return { type: "button", ...options, action: action };
 }
 
 // --- アクション系ヘルパー ---
@@ -119,7 +115,6 @@ function Button(action, options = {}) {
  * メッセージ送信アクションを生成します。
  * @param {string} label - ボタンに表示されるテキスト。
  * @param {string} text - ボタンが押されたときに送信されるテキスト。
- * @returns {object} Message Actionオブジェクト。
  */
 function MessageAction(label, text) {
   return { type: "message", label: label, text: text };
@@ -129,7 +124,6 @@ function MessageAction(label, text) {
  * ポストバックアクションを生成します。
  * @param {string} label - ボタンに表示されるテキスト。
  * @param {string} data - Webhookで送信されるデータ文字列。
- * @returns {object} Postback Actionオブジェクト。
  */
 function PostbackAction(label, data) {
   return { type: "postback", label: label, data: data };
@@ -139,7 +133,6 @@ function PostbackAction(label, data) {
  * URI（URLを開く）アクションを生成します。
  * @param {string} label - ボタンに表示されるテキスト。
  * @param {string} uri - 開くURL。
- * @returns {object} URI Actionオブジェクト。
  */
 function UriAction(label, uri) {
   return { type: "uri", label: label, uri: uri };
@@ -150,7 +143,6 @@ function UriAction(label, uri) {
  * @param {string} label - ボタンに表示されるテキスト。
  * @param {string} data - Webhookで送信されるデータ文字列。
  * @param {object} datetimeOptions - 日時ピッカーの設定 { initial, mode }
- * @returns {object} DatetimePicker Actionオブジェクト。
  */
 function DatetimePickerAction(label, data, { initial, mode }) {
   return { type: "datetimepicker", label: label, data: data, initial: initial, mode: mode };
@@ -165,155 +157,170 @@ function DatetimePickerAction(label, data, { initial, mode }) {
  */
 function getHelpFlexMessage() {
   const helpBubbles = [
-    Bubble({
-      header: Box(
-        [
-          Text(
-            "📅 予定一覧・編集", 
-            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
-          )
-        ], 
-        { backgroundColor: "#176FB8", paddingAll: "12px" }
-      ),
-      body: Box(
-        [
-          Text(
-            "1週間の予定をカード形式で表示。", 
-            { wrap: true, size: "sm", align: "center" }
-          ),
-          Text(
-            "そのカードをタップすると\n予定を編集できます。", 
-            { margin: "none", wrap: true, size: "sm", align: "center", weight: "bold" }
-          )
-        ], 
-        { paddingAll: "15px" }
-      ),
-      footer: Box(
-        [
-          Button(
-            MessageAction("「一覧」を送る", "一覧"), 
-            { style: "primary", height: "sm" }
-          )
-        ], 
-        { paddingTop: "0px" }
-      )
-    }, { size: "hecto" }),
-    Bubble({
-      header: Box(
-        [
-          Text(
-            "🚮 今日のごみを確認", 
-            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
-          )
-        ], 
-        { backgroundColor: "#5A9E46", paddingAll: "12px" }
-      ),
-      body: Box(
-        [
-          Text(
-            "今日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。", 
-            { wrap: true, size: "sm", align: "center" }
-          )
-        ], 
-        { paddingAll: "15px", spacing: "sm" }
-      ),
-      footer: Box(
-        [
-          Button(
-            MessageAction("「今日」を送る", "今日"), 
-            { style: "primary", color: "#5A9E46", height: "sm" }
-          )
-        ], 
-        { paddingTop: "0px" }
-      )
-    }, { size: "hecto" }),
-    Bubble({
-      header: Box(
-        [
-          Text(
-            "🗑️ 明日のごみを確認", 
-            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
-          )
-        ], 
-        { backgroundColor: "#5A9E46", paddingAll: "12px" }
-      ),
-      body: Box(
-        [
-          Text(
-            "明日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。", 
-            { wrap: true, size: "sm", align: "center" }
-          )
-        ], 
-        { paddingAll: "15px", spacing: "sm" }
-      ),
-      footer: Box(
-        [
-          Button(
-            MessageAction("「明日」を送る", "明日"), 
-            { style: "primary", color: "#5A9E46", height: "sm" }
-          )
-        ], 
-        { paddingTop: "0px" }
-      )
-    }, { size: "hecto" }),
-    Bubble({
-      header: Box(
-        [
-          Text(
-            "🔔 リマインダー機能", 
-            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
-          )
-        ], 
-        { backgroundColor: "#176FB8", paddingAll: "12px" }
-      ),
-      body: Box(
-        [
-          Text(
-            "「前日の夜」と「当日の朝」、\n2つのタイミングでごみ出しを\nリマインドできます。", 
-            { wrap: true, size: "sm", align: "center" }
-          )
-        ], 
-        { paddingAll: "15px", spacing: "sm" }
-      ),
-      footer: Box(
-        [
-          Button(
-            MessageAction("時刻を設定する", "リマインダー"), 
-            { style: "primary", color: "#176FB8", height: "sm" }
-          )
-        ], 
-        { paddingTop: "0px" }
-      )
-    }, { size: "hecto" }),
-    Bubble({
-      header: Box(
-        [
-          Text(
-            "⚙️ 利用の停止（退会）", 
-            { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" }
-          )
-        ], 
-        { backgroundColor: "#6C757D", paddingAll: "12px" }
-      ),
-      body: Box(
-        [
-          Text(
-            "利用を停止します。\nデータは一時的に保持され、\nいつでも利用を再開できます。", 
-            { wrap: true, size: "sm", align: "center" }
-          )
-        ], 
-        { paddingAll: "15px", spacing: "sm" }
-      ),
-      footer: Box(
-        [
-          Button(
-            MessageAction("「退会」を送る", "退会"), 
-            { style: "secondary", height: "sm" }
-          )
-        ], 
-        { paddingTop: "0px" }
-      )
-    }, { size: "hecto" })
+    Bubble(
+      { size: "hecto" },
+      {
+        header: Box(
+          { backgroundColor: "#176FB8", paddingAll: "12px" },
+          [
+            Text(
+              { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" },
+              "📅 予定一覧・編集"
+            )
+          ]
+        ),
+        body: Box(
+          { paddingAll: "15px" },
+          [
+            Text(
+              { wrap: true, size: "sm", align: "center" },
+              "1週間の予定をカード形式で表示。"
+            ),
+            Text(
+              { margin: "none", wrap: true, size: "sm", align: "center", weight: "bold" },
+              "そのカードをタップすると\n予定を編集できます。"
+            )
+          ]
+        ),
+        footer: Box(
+          { paddingTop: "0px" },
+          [
+            Button(
+              { style: "primary", height: "sm" },
+              MessageAction("「一覧」を送る", "一覧")
+            )
+          ]
+        )
+      }
+    ),
+    Bubble(
+      { size: "hecto" },
+      {
+        header: Box(
+          { backgroundColor: "#5A9E46", paddingAll: "12px" },
+          [
+            Text(
+              { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" },
+              "🚮 今日のごみを確認"
+            )
+          ]
+        ),
+        body: Box(
+          { paddingAll: "15px", spacing: "sm" },
+          [
+            Text(
+              { wrap: true, size: "sm", align: "center" },
+              "今日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。"
+            )
+          ]
+        ),
+        footer: Box(
+          { paddingTop: "0px" },
+          [
+            Button(
+              { style: "primary", color: "#5A9E46", height: "sm" },
+              MessageAction("「今日」を送る", "今日")
+            )
+          ]
+        )
+      }
+    ),
+    Bubble(
+      { size: "hecto" },
+      {
+        header: Box(
+          { backgroundColor: "#5A9E46", paddingAll: "12px" },
+          [
+            Text(
+              { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" },
+              "🗑️ 明日のごみを確認"
+            )
+          ]
+        ),
+        body: Box(
+          { paddingAll: "15px", spacing: "sm" },
+          [
+            Text(
+              { wrap: true, size: "sm", align: "center" },
+              "明日のごみ出し予定と、\n登録したメモを\nすぐに確認できます。"
+            )
+          ]
+        ),
+        footer: Box(
+          { paddingTop: "0px" },
+          [
+            Button(
+              { style: "primary", color: "#5A9E46", height: "sm" },
+              MessageAction("「明日」を送る", "明日")
+            )
+          ]
+        )
+      }
+    ),
+    Bubble(
+      { size: "hecto" },
+      {
+        header: Box(
+          { backgroundColor: "#176FB8", paddingAll: "12px" },
+          [
+            Text(
+              { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" },
+              "🔔 リマインダー機能"
+            )
+          ]
+        ),
+        body: Box(
+          { paddingAll: "15px", spacing: "sm" },
+          [
+            Text(
+              { wrap: true, size: "sm", align: "center" },
+              "「前日の夜」と「当日の朝」、\n2つのタイミングでごみ出しを\nリマインドできます。"
+            )
+          ]
+        ),
+        footer: Box(
+          { paddingTop: "0px" },
+          [
+            Button(
+              { style: "primary", color: "#176FB8", height: "sm" },
+              MessageAction("時刻を設定する", "リマインダー")
+            )
+          ]
+        )
+      }
+    ),
+    Bubble(
+      { size: "hecto" },
+      {
+        header: Box(
+          { backgroundColor: "#6C757D", paddingAll: "12px" },
+          [
+            Text(
+              { color: "#FFFFFF", weight: "bold", align: "center", size: "lg" },
+              "⚙️ 利用の停止（退会）"
+            )
+          ]
+        ),
+        body: Box(
+          { paddingAll: "15px", spacing: "sm" },
+          [
+            Text(
+              { wrap: true, size: "sm", align: "center" },
+              "利用を停止します。\nデータは一時的に保持され、\nいつでも利用を再開できます。"
+            )
+          ]
+        ),
+        footer: Box(
+          { paddingTop: "0px" },
+          [
+            Button(
+              { style: "secondary", height: "sm" },
+              MessageAction("「退会」を送る", "退会")
+            )
+          ]
+        )
+      }
+    )
   ];
   return FlexMessage(MESSAGES.flex.helpAltText, Carousel(helpBubbles));
 }
@@ -339,8 +346,8 @@ function createScheduleFlexMessage(userId) {
 
     const bodyContents = [
       Text(
-        item,
-        { wrap: true, weight: "bold", size: "md" }
+        { wrap: true, weight: "bold", size: "md" },
+        item
       )
     ];
 
@@ -348,27 +355,30 @@ function createScheduleFlexMessage(userId) {
       bodyContents.push(Separator({ margin: "lg" }));
       bodyContents.push(
         Text(
-          note,
-          { wrap: true, size: "sm", color: "#666666" }
+          { wrap: true, size: "sm", color: "#666666" },
+          note
         )
       );
     }
 
-    return Bubble({
-      header: Box(
-        [
-          Text(
-            day.replace("曜日", ""), 
-            { weight: "bold", size: "xl", color: "#176FB8", align: "center" }
-          )
-        ], 
-        { paddingAll: "10px", backgroundColor: "#f0f8ff" }
-      ),
-      body: Box(bodyContents, { spacing: "md" })
-    }, {
-      size: "nano",
-      action: PostbackAction("変更", `action=startChange&day=${day}`)
-    });
+    return Bubble(
+      {
+        size: "nano",
+        action: PostbackAction("変更", `action=startChange&day=${day}`)
+      },
+      {
+        header: Box(
+          { paddingAll: "10px", backgroundColor: "#f0f8ff" },
+          [
+            Text(
+              { weight: "bold", size: "xl", color: "#176FB8", align: "center" },
+              day.replace("曜日", "")
+            )
+          ]
+        ),
+        body: Box({ spacing: "md" }, bodyContents)
+      }
+    );
   });
 
   return FlexMessage(MESSAGES.flex.scheduleAltText, Carousel(bubbles));
@@ -379,45 +389,45 @@ function createScheduleFlexMessage(userId) {
  */
 function getTermsAgreementFlexMessage(termsUrl) {
   const header = Box(
+    { backgroundColor: "#6C757D", paddingAll: "12px" },
     [
       Text(
-        "📝 ご利用前の確認", 
-        { weight: "bold", color: "#FFFFFF", size: "lg", align: "center" }
+        { weight: "bold", color: "#FFFFFF", size: "lg", align: "center" },
+        "📝 ご利用前の確認"
       )
-    ], 
-    { backgroundColor: "#6C757D", paddingAll: "12px" }
+    ]
   );
   
   const body = Box(
+    { paddingAll: "15px", spacing: "md" },
     [
       Text(
-        "ご利用には、利用規約・プライバシーポリシーへの同意が必要です。内容を確認し、下のボタンを選択してください。", 
-        { wrap: true, size: "sm", align: "center" }
+        { wrap: true, size: "sm", align: "center" },
+        "ご利用には、利用規約・プライバシーポリシーへの同意が必要です。内容を確認し、下のボタンを選択してください。"
       )
-    ], 
-    { paddingAll: "15px", spacing: "md" }
+    ]
   );
 
   const footer = Box(
+    { spacing: "sm", paddingTop: "0px" },
     [
       Button(
-        UriAction("内容を読む", termsUrl), 
-        { height: "sm", style: "link" }
+        { height: "sm", style: "link" },
+        UriAction("内容を読む", termsUrl)
       ),
       Separator({ margin: "md" }),
       Button(
-        PostbackAction("同意して利用を開始する", "action=agreeToTerms"), 
-        { style: "primary", color: "#5A9E46", height: "sm" }
+        { style: "primary", color: "#5A9E46", height: "sm" },
+        PostbackAction("同意して利用を開始する", "action=agreeToTerms")
       ),
       Button(
-        PostbackAction("同意しない", "action=disagreeToTerms"), 
-        { style: "secondary", height: "sm" }
+        { style: "secondary", height: "sm" },
+        PostbackAction("同意しない", "action=disagreeToTerms")
       )
-    ], 
-    { spacing: "sm", paddingTop: "0px" }
+    ]
   );
   
-  const bubble = Bubble({ header, body, footer }, { size: "mega" });
+  const bubble = Bubble({ size: "mega" }, { header, body, footer });
   return FlexMessage("ご利用には利用規約への同意が必要です。", bubble);
 }
 
@@ -430,7 +440,10 @@ function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) 
   
   return FlexMessage(
     "リマインダー設定", 
-    Carousel([nightBubble, morningBubble]), 
+    Carousel([
+      nightBubble, 
+      morningBubble
+    ]), 
     QUICK_REPLIES.DEFAULT
   );
 }
@@ -441,8 +454,8 @@ function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) 
 function createSingleDayFlexMessage(title, day, item, note, altText, withQuickReply = false) {
   const bodyContents = [
     Text(
-      item || "（未設定）", 
-      { wrap: true, weight: "bold", size: "xl", margin: "md" }
+      { wrap: true, weight: "bold", size: "xl", margin: "md" },
+      item || "（未設定）"
     ),
   ];
 
@@ -450,36 +463,37 @@ function createSingleDayFlexMessage(title, day, item, note, altText, withQuickRe
     bodyContents.push(Separator({ margin: "xl" }));
     bodyContents.push(
       Box(
+        { margin: "lg", spacing: "sm" },
         [
-          Text("メモ", { color: "#aaaaaa", size: "sm", flex: 1 }),
-          Text(note, { wrap: true, size: "sm", color: "#666666", flex: 5 }),
-        ], 
-        { margin: "lg", spacing: "sm" }
+          Text({ color: "#aaaaaa", size: "sm", flex: 1 }, "メモ"),
+          Text({ wrap: true, size: "sm", color: "#666666", flex: 5 }, note),
+        ]
       )
     );
   }
 
   const header = Box(
+    { paddingAll: "12px", backgroundColor: "#176FB8" },
     [
       Text(
-        title, 
-        { color: "#ffffff", size: "md", weight: "bold" }
+        { color: "#ffffff", size: "md", weight: "bold" },
+        title
       ),
       Text(
-        day, 
-        { color: "#ffffff", size: "xl", weight: "bold", margin: "sm" }
+        { color: "#ffffff", size: "xl", weight: "bold", margin: "sm" },
+        day
       ),
-    ], 
-    { paddingAll: "12px", backgroundColor: "#176FB8" }
+    ]
   );
   
-  const body = Box(bodyContents, { spacing: "md" });
+  const body = Box({ spacing: "md" }, bodyContents);
   
-  const bubble = Bubble({ header, body }, { size: "kilo" });
+  const bubble = Bubble({ size: "kilo" }, { header, body });
   const quickReply = withQuickReply ? QUICK_REPLIES.DEFAULT : null;
 
   return FlexMessage(altText, bubble, quickReply);
 }
+
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // ３．プライベートヘルパー
@@ -487,30 +501,64 @@ function createSingleDayFlexMessage(title, day, item, note, altText, withQuickRe
 
 /**
  * リマインダー設定用バブルを1つ生成するヘルパー関数
- * @private
  */
 function _createReminderBubble(type, title, description, currentTime, defaultTime) {
   const timeDisplayText = currentTime || 'OFF';
   const timePickerInitial = _formatTimeForPicker(currentTime, defaultTime);
 
-  const header = Box([Text(`⚙️ ${title}`, { weight: "bold", color: "#FFFFFF", size: "lg", align: "center" })], { backgroundColor: "#176FB8", paddingAll: "12px" });
+  const header = Box(
+    { backgroundColor: "#176FB8", paddingAll: "12px" },
+    [
+      Text(
+        { weight: "bold", color: "#FFFFFF", size: "lg", align: "center" },
+        `⚙️ ${title}`
+      )
+    ]
+  );
   
-  const body = Box([
-    Box([
-      Text("現在の通知時刻", { size: "sm", align: "center", color: "#AAAAAA" }),
-      Text(timeDisplayText, { weight: "bold", size: "xxl", align: "center", color: "#333333" })
-    ], { spacing: "none" }),
-    Text(description, { wrap: true, size: "sm", align: "center", color: "#555555" })
-  ], { paddingAll: "15px", spacing: "lg" });
+  const body = Box(
+    { paddingAll: "15px", spacing: "lg" },
+    [
+      Box(
+        { spacing: "none" },
+        [
+          Text(
+            { size: "sm", align: "center", color: "#AAAAAA" },
+            "現在の通知時刻"
+          ),
+          Text(
+            { weight: "bold", size: "xxl", align: "center", color: "#333333" },
+            timeDisplayText
+          )
+        ]
+      ),
+      Text(
+        { wrap: true, size: "sm", align: "center", color: "#555555" },
+        description
+      )
+    ]
+  );
   
-  const footer = Box([
-    Button(DatetimePickerAction("時刻を変更・設定する", `action=setReminderTime&type=${type}`, { initial: timePickerInitial, mode: "time" }), { style: "primary", height: "sm", color: "#176FB8" }),
-    Button(PostbackAction("リマインダーを停止する", `action=stopReminder&type=${type}`), { style: "secondary", height: "sm" }),
-    Separator({ margin: "md" }),
-    Text("※仕様上、通知が最大5分ほどずれる場合があります。", { size: "xxs", color: "#aaaaaa", align: "center", wrap: true, margin: "md" })
-  ], { spacing: "sm" });
+  const footer = Box(
+    { spacing: "sm" },
+    [
+      Button(
+        { style: "primary", height: "sm", color: "#176FB8" },
+        DatetimePickerAction("時刻を変更・設定する", `action=setReminderTime&type=${type}`, { initial: timePickerInitial, mode: "time" })
+      ),
+      Button(
+        { style: "secondary", height: "sm" },
+        PostbackAction("リマインダーを停止する", `action=stopReminder&type=${type}`)
+      ),
+      Separator({ margin: "md" }),
+      Text(
+        { size: "xxs", color: "#aaaaaa", align: "center", wrap: true, margin: "md" },
+        "※仕様上、通知が最大5分ほどずれる場合があります。"
+      )
+    ]
+  );
 
-  return Bubble({ header, body, footer }, { size: "mega" });
+  return Bubble({ size: "mega" }, { header, body, footer });
 }
 
 /**
