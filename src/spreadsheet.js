@@ -271,26 +271,6 @@ function _sanitizeInput(input) {
 }
 
 /**
- * Allowlistに記載されているユーザーIDのリストを取得します。
- * @private
- * @returns {Array<string>} 許可されたユーザーIDの配列
- */
-function _getAllowlistedUserIds() {
-  try {
-    const db = _getDatabase();
-    if (!db) return [];
-    const sheet = db.getSheetByName(SHEET_NAMES.ALLOWLIST);
-    if (!sheet || sheet.getLastRow() < 2) return [];
-
-    // A列の2行目以降の全データを取得し、1次元配列に変換
-    return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().flat();
-  } catch (e) {
-    writeLog('ERROR', `Allowlistの取得でエラー: ${e.stack}`, 'SYSTEM');
-    return [];
-  }
-}
-
-/**
  * Usersシートから、Allowlistに載っていて、かつステータスがアクティブなユーザーのデータをすべて取得します。
  * @returns {Array<Array<string>>|null} 対象ユーザーのデータ配列、またはnull
  */
@@ -341,5 +321,40 @@ function getAllSchedules() {
   } catch (e) {
     writeLog('ERROR', `全スケジュールデータの取得でエラー: ${e.stack}`, 'SYSTEM');
     return null;
+  }
+}
+
+/**
+ * Allowlistに記載されているユーザーIDのリストを取得します。
+ * @private
+ * @returns {Array<string>} 許可されたユーザーIDの配列
+ */
+function _getAllowlistedUserIds() {
+  try {
+    const db = _getDatabase();
+    if (!db) return [];
+    const sheet = db.getSheetByName(SHEET_NAMES.ALLOWLIST);
+    if (!sheet || sheet.getLastRow() < 2) return [];
+
+    // A列の2行目以降の全データを取得し、1次元配列に変換
+    return sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues().flat();
+  } catch (e) {
+    writeLog('ERROR', `Allowlistの取得でエラー: ${e.stack}`, 'SYSTEM');
+    return [];
+  }
+}
+
+/**
+ * 指定したユーザーがAllowlistに登録されているかを確認します。
+ * @param {string} userId - 確認するユーザーID。
+ * @returns {boolean} 登録されていればtrue, されていなければfalse。
+ */
+function isUserOnAllowlist(userId) {
+  try {
+    const allowlist = _getAllowlistedUserIds(); // 以前作成したヘルパーを再利用
+    return allowlist.includes(userId);
+  } catch (e) {
+    writeLog('ERROR', `Allowlistのチェックでエラー: ${e.stack}`, userId);
+    return false;
   }
 }

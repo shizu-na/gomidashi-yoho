@@ -76,11 +76,18 @@ function _handleUnregistration(event) {
 /** 「リマインダー」コマンドを処理します */
 function _handleReminder(event) {
   const userId = event.source.userId;
+
+  // ▼▼▼ 変更点：Allowlistのチェックを追加 ▼▼▼
+  if (!isUserOnAllowlist(userId)) {
+    return [{ type: 'text', text: MESSAGES.permission.reminderDenied }];
+  }
+
   const userRecord = getUserRecord(userId);
   if (!userRecord) {
     writeLog('ERROR', '「リマインダー」処理中にユーザーレコード取得失敗。', userId);
     return [{ type: 'text', text: 'ユーザー情報が見つかりませんでした。'}];
   }
+
   const { nightTime, morningTime } = getReminderTimes(userRecord.row);
   return [getReminderManagementFlexMessage(nightTime, morningTime)];
 }

@@ -593,7 +593,7 @@ function _createReminderBubble(type, title, description, currentTime, defaultTim
       Separator({ margin: "md" }),
       Text(
         { size: "xxs", color: theme.subtleText, align: "center", wrap: true, margin: "md" },
-        "※仕様上、通知が最大5分ほどずれる場合があります。"
+        "※仕様上、通知が最大5分ほどズレます。"
       )
     ]
   );

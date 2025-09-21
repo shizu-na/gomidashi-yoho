@@ -82,8 +82,6 @@ function handlePostback(event) {
     const params = _parseQueryString(postback.data);
     const action = params.action;
     
-    // ▼▼▼ `conversationState`のチェックは不要になったため削除 ▼▼▼
-
     switch (action) {
       // ▼▼▼ 日時ピッカーの応答のみを処理するように簡素化 ▼▼▼
       case 'setReminderTime': {
