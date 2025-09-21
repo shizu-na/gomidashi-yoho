@@ -109,10 +109,19 @@ npx clasp push
   * 時間ベースのタイマー: `分ベースのタイマー`
   * 時間の間隔: `5分ごと`
 
-## 開発支援
+## 開発
 
-`flex_messages.js`には、Flex Messageの開発を支援するテスト用の関数`runMyTest()`が用意されています。
-この関数内でテストしたいメッセージ生成関数を呼び出して実行することで、実行ログにLINE Flex Message Simulatorで使えるJSONが出力されます。
+### 宣言的なUI構築とスタイルガイド
+
+このプロジェクトのFlex Messageは、FlutterのWidgetのように宣言的なコーディングを可能にする、独自の「ビルダー関数」パターンで構築されています。これにより、メンテナンス性と拡張性を大幅に向上させています。
+
+ビルダー関数の使い方やコーディングスタイルに関する詳細なガイドは、以下のドキュメントを参照してください。
+
+* **[Flex Message ビルダー関数 詳細ガイド](./docs/flex_builders.md)**
+
+### テスト支援
+
+`src/_tests.js`には、Flex Messageの開発を支援するテスト用の関数`runMyTest()`が用意されています。この関数内でテストしたいメッセージ生成関数を呼び出して実行することで、実行ログにLINE Flex Message Simulatorで使えるJSONが出力されます。
 
 ```javascript
 function runMyTest() {
@@ -122,33 +131,6 @@ function runMyTest() {
   // テスト実行
   _testFlexMessage(messageToTest);
 }
-```
-
-## コーディングスタイル
-
-このプロジェクトでは、特に`flex_messages.js`におけるコードの可読性と一貫性を高めるため、以下のスタイルガイドを適用します。
-
-### 1. `(options, content)` の引数順
-
-すべてのビルダー関数は、第一引数に装飾や設定を担う`options`オブジェクトを、第二引数に表示内容や子要素を担う`content`を受け取ります。これにより、関数シグネチャが統一され、予測可能なコードになります。
-
-`options`が不要な場合は、空のオブジェクト`{}`を渡します。
-
-### 2. 宣言的なフォーマット
-
-関数呼び出しは、UIの構造とコードの構造を一致させるため、改行を積極的に用いて記述します。
-
-```javascript
-// 書き方の例
-Box(
-  { backgroundColor: "#FFFFFF", paddingAll: "lg" }, // Boxのoptions
-  [ // Boxのcontent (配列)
-    Text(
-      { size: "sm" }, // Textのoptions
-      "こんにちは"       // Textのcontent
-    )
-  ]
-)
 ```
 
 ## 利用規約とライセンス

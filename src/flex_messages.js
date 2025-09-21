@@ -20,6 +20,30 @@
  * )
  */
 
+// カラーテーマ定義
+const THEME = {
+  DEFAULT: {
+    headerBg: "#176FB8", // 元々の青色
+    headerText: "#FFFFFF",
+    bodyText: "#666666",
+    subtleText: "#aaaaaa",
+  },
+  NIGHT: {
+    headerBg: "#2c3e50", // 夜空のようなダークブルー
+    headerText: "#FFFFFF",
+    buttonBg: "#2c3e50",
+    bodyText: "#333333",
+    subtleText: "#AAAAAA",
+  },
+  MORNING: {
+    headerBg: "#3498db", // 空のようなライトブルー
+    headerText: "#FFFFFF",
+    buttonBg: "#3498db",
+    bodyText: "#333333",
+    subtleText: "#AAAAAA",
+  }
+};
+
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // １．ビルダー関数 (再利用可能な「LEGOブロック」)
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -432,24 +456,6 @@ function getTermsAgreementFlexMessage(termsUrl) {
   return FlexMessage("ご利用には利用規約への同意が必要です。", bubble);
 }
 
-// リマインダーカード用のカラーテーマ定義
-const THEME = {
-  NIGHT: {
-    headerBg: "#2c3e50", // 夜空のようなダークブルー
-    headerText: "#FFFFFF",
-    buttonBg: "#2c3e50",
-    bodyText: "#333333",
-    subtleText: "#AAAAAA",
-  },
-  MORNING: {
-    headerBg: "#3498db", // 空のようなライトブルー
-    headerText: "#FFFFFF",
-    buttonBg: "#3498db",
-    bodyText: "#333333",
-    subtleText: "#AAAAAA",
-  }
-};
-
 /**
  * リマインダー設定・管理用のFlex Messageを生成します。
  */
@@ -485,7 +491,7 @@ function getReminderManagementFlexMessage(currentNightTime, currentMorningTime) 
 /**
  * 単日のごみ出し情報を表示するためのFlex Messageを生成します。
  */
-function createSingleDayFlexMessage(title, day, item, note, altText, withQuickReply = false) {
+function createSingleDayFlexMessage(title, day, item, note, altText, withQuickReply = false, theme = THEME.DEFAULT) {
   const bodyContents = [
     Text(
       { wrap: true, weight: "bold", size: "xl", margin: "md" },
@@ -499,22 +505,22 @@ function createSingleDayFlexMessage(title, day, item, note, altText, withQuickRe
       Box(
         { margin: "lg", spacing: "sm" },
         [
-          Text({ color: "#aaaaaa", size: "sm", flex: 1 }, "メモ"),
-          Text({ wrap: true, size: "sm", color: "#666666", flex: 5 }, note),
+          Text({ color: theme.subtleText, size: "sm", flex: 1 }, "メモ"),
+          Text({ wrap: true, size: "sm", color: theme.bodyText, flex: 5 }, note),
         ]
       )
     );
   }
 
   const header = Box(
-    { paddingAll: "12px", backgroundColor: "#176FB8" },
+    { paddingAll: "12px", backgroundColor: theme.headerBg },
     [
       Text(
-        { color: "#ffffff", size: "md", weight: "bold" },
+        { color: theme.headerText, size: "md", weight: "bold" },
         title
       ),
       Text(
-        { color: "#ffffff", size: "xl", weight: "bold", margin: "sm" },
+        { color: theme.headerText, size: "xl", weight: "bold", margin: "sm" },
         day
       ),
     ]
@@ -527,7 +533,6 @@ function createSingleDayFlexMessage(title, day, item, note, altText, withQuickRe
 
   return FlexMessage(altText, bubble, quickReply);
 }
-
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // ３．プライベートヘルパー

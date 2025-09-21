@@ -299,24 +299,26 @@ function _isTimeToSend(now, timeString) {
  */
 function _sendReminderMessage(userId, userSchedules, targetDay, type) {
   const schedule = userSchedules.find(row => row[COLUMNS_SCHEDULE.DAY_OF_WEEK] === targetDay);
-  if (!schedule) {
-    return;
-  }
+  if (!schedule) return;
 
   const item = schedule[COLUMNS_SCHEDULE.GARBAGE_TYPE];
   const note = schedule[COLUMNS_SCHEDULE.NOTES];
   
-  let title, dayText;
+  let title, dayText, theme; // theme変数を追加
   if (type === 'night') {
     title = '夜のリマインダー🔔';
     dayText = `明日のごみ (${targetDay})`;
+    theme = THEME.NIGHT; // 夜用テーマを選択
   } else {
     title = '朝のリマインダー☀️';
     dayText = `今日のごみ (${targetDay})`;
+    theme = THEME.MORNING; // 朝用テーマを選択
   }
 
   const altText = `【リマインダー】${dayText.split(' ')[0]}は「${item}」です。`;
-  const flexMessage = createSingleDayFlexMessage(title, dayText, item, note, altText, true);
+  
+  // ▼▼▼ createSingleDayFlexMessageにthemeを渡す ▼▼▼
+  const flexMessage = createSingleDayFlexMessage(title, dayText, item, note, altText, true, theme);
   
   pushToLine(userId, [flexMessage]);
   writeLog('INFO', `${type === 'night' ? '夜' : '朝'}リマインダー送信`, userId);
