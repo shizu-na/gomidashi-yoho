@@ -56,35 +56,10 @@ Box(
 
 このプロジェクトのFlex Messageで、現在実際に使用されている`options`のプロパティ一覧です。より詳細な情報は、[LINE Developersの公式リファレンス](https://developers.line.biz/ja/docs/messaging-api/flex-message-layout/)を参照してください。
 
-### `Bubble(options, ...)`
-
-- `size`
-- `action`
-
-### `Box(options, ...)`
-
-- `backgroundColor`
-- `paddingAll`
-- `paddingTop`
-- `spacing`
-- `margin`
-
-### `Text(options, ...)`
-
-- `color`
-- `weight`
-- `align`
-- `size`
-- `wrap`
-- `margin`
-- `flex`
-
-### `Button(options, ...)`
-
-- `style`
-- `height`
-- `color`
-
-### `Separator(options)`
-
-- `margin`
+| コンポーネント | 利用可能なオプション |
+|----------------|----------------------|
+| **Bubble**     | `size`, `action` |
+| **Box**        | `backgroundColor`, `paddingAll`, `paddingTop`, `spacing`, `margin` |
+| **Text**       | `color`, `weight`, `align`, `size`, `wrap`, `margin`, `flex` |
+| **Button**     | `style`, `height`, `color` |
+| **Separator**  | `margin` |
